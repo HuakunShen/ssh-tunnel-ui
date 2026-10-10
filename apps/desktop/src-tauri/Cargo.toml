@@ -1,0 +1,40 @@
+# The desktop shell is its own workspace, and that is the point of this file.
+#
+# `cargo build` at the repository root must never need a WebView: the tunnel
+# backend is TypeScript, and nothing in this shell may pull WebView deps into
+# any other build. Keeping the desktop crate in a separate workspace makes
+# that structural — nothing else in this repo can reach these dependencies.
+[workspace]
+
+[package]
+name = "ssh-tunnel-desktop"
+version = "0.1.0"
+description = "SSH tunnel manager desktop shell: spawns the tunnel daemon sidecar and opens the Web UI."
+edition = "2021"
+rust-version = "1.77"
+license = "MIT"
+publish = false
+
+[lib]
+name = "ssh_tunnel_desktop"
+path = "src/lib.rs"
+
+[[bin]]
+name = "ssh-tunnel-desktop"
+path = "src/main.rs"
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-shell = "2"
+tauri-plugin-dialog = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+ureq = { version = "2", default-features = false, features = ["tls"] }
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[profile.release]
+opt-level = "s"
+lto = "thin"
+codegen-units = 1

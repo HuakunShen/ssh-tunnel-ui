@@ -300,12 +300,16 @@ importers:
 
   integrations/dsh:
     dependencies:
-      '@ssh-tunnel/client':
+      '@ssh-tunnel/host-node':
         specifier: workspace:*
-        version: link:../../packages/ssh-client
-      '@ssh-tunnel/contract':
+        version: link:../../packages/ssh-host-node
+      '@ssh-tunnel/service':
         specifier: workspace:*
-        version: link:../../packages/ssh-contract
+        version: link:../../packages/ssh-service
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 26.5.1
 
   integrations/vscode:
     dependencies:

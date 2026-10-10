@@ -71,8 +71,26 @@ Closed `TUNNEL_PROBLEM_CODES` (13) + `TunnelError(code)`; clients branch on
 
 `packages/ssh-contract` (zod, strict requests / loose responses) → typed
 `ssh-client` (injected `fetch`) → TUI, Web (static, zero-dep), CLI
-(daemon + `--direct`), Tauri stub, DSH plugin, VS Code stub. Adding a front
-= new `apps/` or `integrations/` dir, no domain logic copied.
+(daemon + `--direct`), Tauri desktop shell, DSH plugin, VS Code stub. Adding
+a front = new `apps/` or `integrations/` dir, no domain logic copied.
+
+## Desktop shell (Tauri, real)
+
+`apps/desktop/src-tauri` is a separate cargo workspace (structural isolation:
+root builds never see WebView deps). The Rust shell is thin by design —
+`spawn_sidecar` starts the bundled `server.mjs` via node (or attaches to a
+running daemon), waits for `/api/health`, and opens the bundled Web UI.
+`cargo check` + `cargo clippy -D warnings` + `cargo build` all pass; the
+`daemon_url` command lets the UI discover the port without hardcoding.
+
+## DSH plugin (real host + client halves)
+
+Follows the Refyard/Space Lens shape: `integrations/dsh/src/host.ts`
+assembles a real `TunnelManager` + Hono app in the Harness process and mounts
+it at `/ssh-tunnel` on the Harness webServer (loopback Host/Origin/
+Sec-Fetch-Site guards, `SSH_TUNNEL_HOME`-overridable store);
+`src/client.js` registers the panel and frames the workbench. Covered by
+`tests/contract/dsh.test.ts` (mount, context, CRUD proxy, 403).
 
 ## Live-test evidence (2026-10-11, this repo)
 

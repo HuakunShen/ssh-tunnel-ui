@@ -1,0 +1,1 @@
+{"main-capability":{"identifier":"main-capability","description":"Minimal shell permissions: open the window and run the daemon sidecar.","local":true,"windows":["main"],"permissions":["core:default","shell:allow-spawn","dialog:default"]}}

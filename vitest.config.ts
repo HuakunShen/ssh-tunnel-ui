@@ -16,6 +16,7 @@ export default defineConfig({
       "@ssh-tunnel/client": `${root}packages/ssh-client/src/index.ts`,
       "@ssh-tunnel/host-node": `${root}packages/ssh-host-node/src/index.ts`,
       "@ssh-tunnel/service": `${root}packages/ssh-service/src/index.ts`,
+      "dsh-plugin-ssh-tunnel": `${root}integrations/dsh/src/host.ts`,
     },
   },
   test: {
