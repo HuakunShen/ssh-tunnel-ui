@@ -17,6 +17,8 @@ export default defineConfig({
       "@ssh-tunnel/host-node": `${root}packages/ssh-host-node/src/index.ts`,
       "@ssh-tunnel/service": `${root}packages/ssh-service/src/index.ts`,
       "dsh-plugin-ssh-tunnel": `${root}integrations/dsh/src/host.ts`,
+      "vscode-ssh-tunnel/supervisor": `${root}integrations/vscode/src/supervisor.ts`,
+      "vscode-ssh-tunnel/tree": `${root}integrations/vscode/src/tree.ts`,
     },
   },
   test: {

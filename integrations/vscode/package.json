@@ -1,20 +1,77 @@
 {
   "name": "vscode-ssh-tunnel",
+  "displayName": "SSH Tunnel",
+  "description": "One-click SSH tunnels: remember every forward, start/stop from the sidebar.",
   "version": "0.1.0",
   "private": true,
-  "type": "module",
-  "description": "VS Code extension stub: tree view + start/stop commands over the same daemon API.",
+  "publisher": "sshtunnel",
+  "license": "MIT",
   "engines": {
     "vscode": "^1.90.0"
   },
-  "exports": {
-    ".": "./src/extension.ts"
+  "categories": ["Other"],
+  "main": "./dist/extension.js",
+  "activationEvents": [],
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "sshTunnel",
+          "title": "SSH Tunnel",
+          "icon": "assets/tunnel.svg"
+        }
+      ]
+    },
+    "views": {
+      "sshTunnel": [
+        {
+          "id": "sshTunnel.tunnels",
+          "name": "Tunnels"
+        }
+      ]
+    },
+    "commands": [
+      { "command": "ssh-tunnel.start", "title": "Start Tunnel", "category": "SSH Tunnel", "icon": "$(play)" },
+      { "command": "ssh-tunnel.stop", "title": "Stop Tunnel", "category": "SSH Tunnel", "icon": "$(stop)" },
+      { "command": "ssh-tunnel.probe", "title": "Probe Tunnel", "category": "SSH Tunnel", "icon": "$(pulse)" },
+      { "command": "ssh-tunnel.stopAll", "title": "Stop All Tunnels", "category": "SSH Tunnel" },
+      { "command": "ssh-tunnel.refresh", "title": "Refresh", "category": "SSH Tunnel", "icon": "$(refresh)" },
+      { "command": "ssh-tunnel.openWorkbench", "title": "Open Workbench", "category": "SSH Tunnel" }
+    ],
+    "menus": {
+      "view/title": [
+        { "command": "ssh-tunnel.refresh", "when": "view == sshTunnel.tunnels", "group": "navigation" },
+        { "command": "ssh-tunnel.openWorkbench", "when": "view == sshTunnel.tunnels", "group": "navigation" },
+        { "command": "ssh-tunnel.stopAll", "when": "view == sshTunnel.tunnels" }
+      ],
+      "view/item/context": [
+        { "command": "ssh-tunnel.start", "when": "view == sshTunnel.tunnels && viewItem == tunnelStopped", "group": "inline" },
+        { "command": "ssh-tunnel.stop", "when": "view == sshTunnel.tunnels && viewItem == tunnelRunning", "group": "inline" },
+        { "command": "ssh-tunnel.probe", "when": "view == sshTunnel.tunnels", "group": "inline" }
+      ]
+    },
+    "configuration": {
+      "title": "SSH Tunnel",
+      "properties": {
+        "sshTunnel.daemonUrl": {
+          "type": "string",
+          "default": "",
+          "description": "Daemon URL to attach to (empty = spawn/attach http://127.0.0.1:7432)."
+        }
+      }
+    }
   },
   "scripts": {
-    "check": "tsc --noEmit -p tsconfig.json"
+    "check": "tsc --noEmit -p tsconfig.json",
+    "build": "node ../../scripts/build-vscode.mjs",
+    "package": "pnpm build && npx -y @vscode/vsce package --no-dependencies -o ssh-tunnel-0.1.0.vsix"
   },
   "dependencies": {
     "@ssh-tunnel/client": "workspace:*",
     "@ssh-tunnel/contract": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "@types/vscode": "1.90.0"
   }
 }

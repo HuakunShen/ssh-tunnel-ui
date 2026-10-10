@@ -319,6 +319,13 @@ importers:
       '@ssh-tunnel/contract':
         specifier: workspace:*
         version: link:../../packages/ssh-contract
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 26.5.1
+      '@types/vscode':
+        specifier: 1.90.0
+        version: 1.90.0
 
   packages/ssh-client:
     dependencies:
@@ -744,6 +751,9 @@ packages:
 
   '@types/react@19.3.0':
     resolution: {integrity: sha512-N0rFCuH9YoxG9/m61l9MfpJKfmLOVU0em7ipIz6TRgSSkvReLB9vL85GB+yr8Bs5leqpvg96JSwF4ZS1s4viQg==}
+
+  '@types/vscode@1.90.0':
+    resolution: {integrity: sha512-oT+ZJL7qHS9Z8bs0+WKf/kQ27qWYR3trsXpq46YDjFqBsMLG4ygGGjPaJ2tyrH0wJzjOEmDyg9PDJBBhWg9pkQ==}
 
   '@vitest/expect@4.1.11':
     resolution: {integrity: sha512-VX2x5vNJXET47KAFzwERI+KRMtTTCSWTfSMKsW7JsUsXV4psq++e3DvZpuTDOpHcxytiDs6p2nhVb2tVDiiUYw==}
@@ -1378,6 +1388,8 @@ snapshots:
   '@types/react@19.3.0':
     dependencies:
       csstype: 3.2.3
+
+  '@types/vscode@1.90.0': {}
 
   '@vitest/expect@4.1.11':
     dependencies:

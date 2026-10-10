@@ -92,6 +92,17 @@ Sec-Fetch-Site guards, `SSH_TUNNEL_HOME`-overridable store);
 `src/client.js` registers the panel and frames the workbench. Covered by
 `tests/contract/dsh.test.ts` (mount, context, CRUD proxy, 403).
 
+## VS Code extension (real)
+
+`integrations/vscode` ships a real extension (space-lens shape): `supervisor.ts`
+attaches to a healthy daemon or spawns the staged `server.mjs` (`fetch`
+injectable for tests; spawn `error` swallowed, readiness timeout reports);
+`tree.ts` renders the sidebar with running/stopped context values;
+`extension.ts` wires start/stop/probe/stop-all/refresh/openWorkbench (webview
+frames the daemon Web UI). esbuild CJS bundle, `vscode` external, vsix via
+`vsce`. Covered by `tests/contract/vscode.test.ts` (attach, spawn failure,
+tree render, offline clear).
+
 ## Live-test evidence (2026-10-11, this repo)
 
 - daemon `health ok`, Web `200`, `ssh-hosts` lists ufo/mac-mini/rog16-windows.
