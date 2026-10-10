@@ -1,0 +1,28 @@
+{
+  "name": "ssh-tunnel-ui",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "license": "MIT",
+  "packageManager": "pnpm@12.8.1",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "turbo run build",
+    "check": "turbo run check",
+    "check:boundaries": "node --experimental-strip-types scripts/check-boundaries.ts",
+    "test": "vitest run",
+    "serve": "node apps/server/dist/server.mjs",
+    "tui": "node apps/tui/dist/tui.mjs",
+    "format": "prettier --write \"**/*.{ts,tsx,md,json,yaml}\""
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "prettier": "^3.7.4",
+    "turbo": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:",
+    "esbuild": "catalog:"
+  }
+}

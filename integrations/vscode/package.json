@@ -1,0 +1,20 @@
+{
+  "name": "vscode-ssh-tunnel",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "VS Code extension stub: tree view + start/stop commands over the same daemon API.",
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "exports": {
+    ".": "./src/extension.ts"
+  },
+  "scripts": {
+    "check": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@ssh-tunnel/client": "workspace:*",
+    "@ssh-tunnel/contract": "workspace:*"
+  }
+}

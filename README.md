@@ -1,0 +1,80 @@
+# ssh-tunnel-ui
+
+A one-click SSH tunnel manager: remember every tunnel, start/stop with a keypress.
+
+Monorepo with **one portable backend** consumed by many thin fronts:
+
+```
+packages/ssh-contract   — closed error codes, zod schemas, HTTP/WS contract (host-free)
+packages/ssh-core       — tunnel model, ssh argv builder, validation, state machine (host-free)
+packages/ssh-client     — typed fetch client for the HTTP API (host-free)
+packages/ssh-host-node  — Node host: process spawn/monitor, TCP health check, JSON store, SSH config read (host)
+packages/ssh-service    — composition root: store + manager + HTTP server (Hono) (host)
+apps/server             — `ssh-tunnel-serve` daemon binary (composition, argv only)
+apps/cli                — `ssh-tunnel` CLI: direct-mode + server-mode (composition)
+apps/tui                — `ssh-tunnel-tui` fullscreen TUI over OpenTUI+React (thin front)
+apps/web                — static Web UI served by the daemon (thin front, fetch API)
+apps/desktop            — Tauri shell stub wrapping the Web UI (thin front)
+integrations/dsh        — DeepSeek Harness plugin stub (thin front)
+integrations/vscode     — VS Code extension stub (thin front)
+```
+
+## Why TypeScript
+
+Backend is management-plane only (profile CRUD, `ssh -N` process supervision,
+TCP dial health checks, JSON persistence, HTTP API). The data plane stays in
+system OpenSSH, so language barely matters for performance — TS wins on
+cross-platform fronts (TUI via OpenTUI, Web UI, DSH/VS Code plugins share the
+contract + client with zero rewrite). One `pnpm install`, one `tsc`, one test
+suite covers all fronts.
+
+## Tunnel kinds supported
+
+| kind | ssh flag | meaning |
+|---|---|---|
+| `local` | `-L [bind:]port:host:hostport` | expose remote service locally |
+| `remote` | `-R [bind:]port:host:hostport` | expose local service remotely |
+| `dynamic` | `-D [bind:]port` | local SOCKS5 proxy |
+| `jump` | `-J hop1,hop2` + target | reach host via bastion(s) |
+| `socks-via-remote` | `-R` carrying SOCKS | reverse SOCKS (documented preset) |
+
+Every profile additionally supports: multiple `-L/-R/-D` forwards in one
+tunnel, `-J` jump hops, extra `-o` options, `ServerAliveInterval`,
+private-key path, `ExitOnForwardFailure`, `ClearAllForwardings`, local/remote
+command execution (`-N` default), and GatewayPorts awareness for `-R`
+bind addresses.
+
+## Quickstart
+
+```sh
+pnpm install
+pnpm check        # tsc --noEmit everywhere (12 packages)
+pnpm check:boundaries
+pnpm test         # vitest: 21 tests (core argv/validate/machine + HTTP API)
+pnpm build        # esbuild bundles for server/cli/tui + static web dist
+
+# daemon + web UI
+node apps/server/dist/server.mjs --port=7432 --web-dir=apps/web/dist
+# http://127.0.0.1:7432  (API at /api/*, Web UI at /)
+# TUI (talks to daemon, or `ssh-tunnel-tui --direct` for standalone)
+node apps/tui/dist/tui.mjs
+# CLI (daemon mode default, `--direct` embeds the manager)
+node apps/cli/dist/cli.mjs list
+```
+
+## Status (verified live 2026-10-11)
+
+Local / remote / dynamic-SOCKS / jump / multi — all exercised against real
+hosts (`ufo` Ubuntu, `mac-mini`, `rog16-windows` with OpenSSH_for_Windows):
+see `docs/design.md` for the evidence table. TUI renders (OpenTUI), Web UI is
+a zero-dependency static page, Tauri/DSH/VS Code ship as thin stubs over the
+same typed client.
+
+## Layout rules (machine-checked)
+
+- Portable packages (`ssh-contract`, `ssh-core`, `ssh-client`) must not import
+  `node:*`, DOM, or host packages — `pnpm check:boundaries` enforces it.
+- `apps/*` hold composition + argv parsing only; no domain logic.
+- Internal deps are `workspace:*`; third-party versions live in the root catalog.
+- Internal packages export TS source directly (`./src/index.ts`), no build.
+  Only runnable artifacts (server/cli/tui bundles) use esbuild single-file output.

@@ -1,0 +1,30 @@
+{
+  "name": "@ssh-tunnel/tui",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "ssh-tunnel-tui": "./dist/tui.mjs"
+  },
+  "exports": {
+    ".": "./src/tui.tsx"
+  },
+  "scripts": {
+    "check": "tsc --noEmit -p tsconfig.json",
+    "build": "node ../../scripts/build-binary.mjs tui"
+  },
+  "dependencies": {
+    "@opentui/core": "catalog:",
+    "@opentui/react": "catalog:",
+    "@ssh-tunnel/client": "workspace:*",
+    "@ssh-tunnel/contract": "workspace:*",
+    "@ssh-tunnel/core": "workspace:*",
+    "@ssh-tunnel/host-node": "workspace:*",
+    "@ssh-tunnel/service": "workspace:*",
+    "react": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "@types/react": "catalog:"
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "name": "@ssh-tunnel/server",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "ssh-tunnel-serve": "./dist/server.mjs"
+  },
+  "exports": {
+    ".": "./src/server.ts"
+  },
+  "scripts": {
+    "check": "tsc --noEmit -p tsconfig.json",
+    "build": "node ../../scripts/build-binary.mjs server"
+  },
+  "dependencies": {
+    "@ssh-tunnel/service": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:"
+  }
+}

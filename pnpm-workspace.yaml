@@ -1,0 +1,39 @@
+packages:
+  - "apps/*"
+  - "packages/*"
+  - "integrations/*"
+  - "tests/*"
+
+# Every dependency version lives here so a package.json can only ask for a name.
+# Bumping a version means editing this file, which shows up in the task's own commit.
+catalog:
+  "@opentui/core": 0.6.0
+  "@opentui/react": 0.6.0
+  "@types/node": 26.5.1
+  "@types/react": 19.3.0
+  esbuild: 0.28.2
+  hono: 4.13.8
+  "@hono/node-server": 2.1.1
+  react: 19.3.0
+  turbo: 2.10.12
+  typescript: 5.9.2
+  vite: 8.3.4
+  vitest: 4.1.11
+  zod: 4.6.5
+
+# esbuild's install script only places its own platform binary; nothing else
+# in the workspace is allowed to run install scripts.
+allowBuilds:
+  esbuild: true
+
+minimumReleaseAgeExclude:
+  - "@opentui/core-darwin-arm64@0.6.0"
+  - "@opentui/core-darwin-x64@0.6.0"
+  - "@opentui/core-linux-arm64-musl@0.6.0"
+  - "@opentui/core-linux-arm64@0.6.0"
+  - "@opentui/core-linux-x64-musl@0.6.0"
+  - "@opentui/core-linux-x64@0.6.0"
+  - "@opentui/core-win32-arm64@0.6.0"
+  - "@opentui/core-win32-x64@0.6.0"
+  - "@opentui/core@0.6.0"
+  - "@opentui/react@0.6.0"

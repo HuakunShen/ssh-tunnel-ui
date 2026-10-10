@@ -1,0 +1,25 @@
+{
+  "name": "@ssh-tunnel/cli",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "ssh-tunnel": "./dist/cli.mjs"
+  },
+  "exports": {
+    ".": "./src/cli.ts"
+  },
+  "scripts": {
+    "check": "tsc --noEmit -p tsconfig.json",
+    "build": "node ../../scripts/build-binary.mjs cli"
+  },
+  "dependencies": {
+    "@ssh-tunnel/client": "workspace:*",
+    "@ssh-tunnel/contract": "workspace:*",
+    "@ssh-tunnel/host-node": "workspace:*",
+    "@ssh-tunnel/service": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:"
+  }
+}
