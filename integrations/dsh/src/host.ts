@@ -26,7 +26,9 @@ import {
   type ServerResponse,
 } from "node:http";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { existsSync, readFileSync } from "node:fs";
+import { dirname, extname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { TunnelManager } from "@ssh-tunnel/service";
 import { createServiceApp } from "@ssh-tunnel/service";
 import {
@@ -95,9 +97,41 @@ export function apply(ctx: HostContext): void {
     clock: systemClock,
     logDir: join(base, "logs"),
   });
-  // Same Hono app the daemon serves (minus its static-file fallthrough: the
-  // Harness owns document serving, this route only answers /api/*).
+  // Same Hono app the daemon serves for `/api/*`, plus the static Web UI
+  // this package stages under `web/` at build time (see `scripts/build.ts`).
+  // Without the document branch the panel frame would land on a 404.
   const api = createServiceApp({ manager, serviceInstanceId: "dsh-plugin" });
+  const webRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "web");
+
+  const WEB_MIME: Record<string, string> = {
+    ".html": "text/html; charset=utf-8",
+    ".js": "text/javascript; charset=utf-8",
+    ".css": "text/css; charset=utf-8",
+    ".json": "application/json; charset=utf-8",
+    ".svg": "image/svg+xml",
+    ".png": "image/png",
+    ".ico": "image/x-icon",
+  };
+
+  function serveDocument(urlPath: string, res: ServerResponse): boolean {
+    const rel = urlPath === `${PREFIX}/` || urlPath === PREFIX ? "index.html" : urlPath.slice(PREFIX.length + 1);
+    if (rel.includes("..")) return false;
+    const file = join(webRoot, rel);
+    if (!existsSync(file)) {
+      // SPA fallback: deep links resolve to the shell.
+      const index = join(webRoot, "index.html");
+      if (!existsSync(index)) return false;
+      res.writeHead(200, { "content-type": WEB_MIME[".html"] ?? "text/html", "cache-control": "no-store" });
+      res.end(readFileSync(index));
+      return true;
+    }
+    res.writeHead(200, {
+      "content-type": WEB_MIME[extname(file)] ?? "application/octet-stream",
+      "cache-control": "no-store",
+    });
+    res.end(readFileSync(file));
+    return true;
+  }
 
   function originsFor(port: number): readonly string[] {
     return [`http://127.0.0.1:${port}`, `http://localhost:${port}`];
@@ -138,6 +172,7 @@ export function apply(ctx: HostContext): void {
       return;
     }
     if (!url.pathname.startsWith(`${PREFIX}/api/`)) {
+      if (serveDocument(url.pathname, res)) return;
       sendProblem(res, 404, "unknown ssh-tunnel panel route");
       return;
     }

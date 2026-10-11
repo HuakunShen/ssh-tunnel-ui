@@ -9,11 +9,14 @@
   },
   "scripts": {
     "check": "tsc --noEmit -p tsconfig.json",
-    "build": "node ../../scripts/build-desktop-stub.mjs",
+    "build": "bun ./scripts/build.ts",
     "tauri:init": "echo 'tauri init goes here: pnpm dlx @tauri-apps/cli init pointing at ../web/dist with devUrl http://127.0.0.1:7432'"
   },
   "dependencies": {
     "@ssh-tunnel/client": "workspace:*",
     "@ssh-tunnel/contract": "workspace:*"
+  },
+  "devDependencies": {
+    "@ssh-tunnel/build-helper": "workspace:*"
   }
 }

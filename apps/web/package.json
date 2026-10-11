@@ -3,8 +3,29 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
+  "description": "SSH tunnel console: SvelteKit static SPA served by the daemon, embedded in Tauri/VS Code/DSH.",
   "scripts": {
-    "check": "node -e \"console.log('web: static, nothing to typecheck')\"",
-    "build": "node ../../scripts/build-web.mjs"
+    "dev": "vite dev",
+    "build": "bun ./scripts/build.ts",
+    "preview": "vite preview",
+    "prepare": "svelte-kit sync || echo ''",
+    "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json"
+  },
+  "dependencies": {
+    "@lucide/svelte": "catalog:",
+    "@ssh-tunnel/client": "workspace:*",
+    "@ssh-tunnel/contract": "workspace:*"
+  },
+  "devDependencies": {
+    "@ssh-tunnel/build-helper": "workspace:*",
+    "@sveltejs/adapter-static": "catalog:",
+    "@sveltejs/kit": "catalog:",
+    "@sveltejs/vite-plugin-svelte": "catalog:",
+    "@tailwindcss/vite": "catalog:",
+    "svelte": "catalog:",
+    "svelte-check": "catalog:",
+    "tailwindcss": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:"
   }
 }

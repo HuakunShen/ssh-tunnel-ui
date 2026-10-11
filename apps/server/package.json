@@ -11,12 +11,13 @@
   },
   "scripts": {
     "check": "tsc --noEmit -p tsconfig.json",
-    "build": "node ../../scripts/build-binary.mjs server"
+    "build": "bun ./scripts/build.ts"
   },
   "dependencies": {
     "@ssh-tunnel/service": "workspace:*"
   },
   "devDependencies": {
-    "@types/node": "catalog:"
+    "@types/node": "catalog:",
+    "@ssh-tunnel/build-helper": "workspace:*"
   }
 }

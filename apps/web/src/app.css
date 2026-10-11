@@ -1,0 +1,41 @@
+/**
+ * `apps/web` stylesheet: Tailwind 4 theme tokens for the tunnel console.
+ *
+ * Dark-first "network operations" aesthetic: deep slate canvas, cyan signal
+ * accents per status (running green / degraded amber / failed red), glassy
+ * cards, mono type for addresses/ports/commands. Light mode follows the same
+ * tokens via CSS variables so components never hardcode a palette.
+ */
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+  --color-signal-running: #34d399;
+  --color-signal-degraded: #fbbf24;
+  --color-signal-failed: #f87171;
+  --color-signal-idle: #64748b;
+  --color-signal-starting: #22d3ee;
+}
+
+html {
+  color-scheme: dark light;
+}
+
+body {
+  @apply bg-slate-950 text-slate-100 antialiased;
+  background-image:
+    radial-gradient(1200px 500px at 80% -10%, rgb(34 211 238 / 0.08), transparent 60%),
+    radial-gradient(900px 420px at 10% 0%, rgb(52 211 153 / 0.07), transparent 55%);
+  background-attachment: fixed;
+}
+
+@media (prefers-color-scheme: light) {
+  body {
+    @apply bg-slate-100 text-slate-900;
+    background-image:
+      radial-gradient(1200px 500px at 80% -10%, rgb(8 145 178 / 0.1), transparent 60%),
+      radial-gradient(900px 420px at 10% 0%, rgb(5 150 105 / 0.08), transparent 55%);
+  }
+}
