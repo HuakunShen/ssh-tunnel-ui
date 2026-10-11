@@ -13,16 +13,18 @@
     "check": "turbo run check",
     "check:boundaries": "node --experimental-strip-types scripts/check-boundaries.ts",
     "test": "vitest run",
+    "test:e2e": "vitest run --config vitest.e2e.config.ts",
     "serve": "node apps/server/dist/server.mjs",
     "tui": "node apps/tui/dist/tui.mjs",
     "format": "prettier --write \"**/*.{ts,tsx,md,json,yaml}\""
   },
   "devDependencies": {
+    "@microsoft/tui-test": "catalog:",
     "@types/node": "catalog:",
+    "esbuild": "catalog:",
     "prettier": "^3.7.4",
     "turbo": "catalog:",
     "typescript": "catalog:",
-    "vitest": "catalog:",
-    "esbuild": "catalog:"
+    "vitest": "catalog:"
   }
 }

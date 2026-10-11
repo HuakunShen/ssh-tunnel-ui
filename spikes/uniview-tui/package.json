@@ -1,0 +1,21 @@
+{
+  "name": "@ssh-tunnel/uniview-spike",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Spike: evaluate @uniview/tui-react for the tunnel TUI (memory-surface tests, no TTY). Not shipped.",
+  "scripts": {
+    "check": "tsc --noEmit -p tsconfig.json"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "@types/react": "catalog:",
+    "@uniview/tui-react": "0.0.3",
+    "react": "catalog:"
+  },
+  "exports": {
+    ".": "./src/spike.tsx",
+    "./spike": "./src/spike.tsx",
+    "./package.json": "./package.json"
+  }
+}

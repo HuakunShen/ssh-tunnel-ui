@@ -167,6 +167,9 @@ catalogs:
     '@hono/node-server':
       specifier: 2.1.1
       version: 2.1.1
+    '@microsoft/tui-test':
+      specifier: 0.1.0
+      version: 0.1.0
     '@opentui/core':
       specifier: 0.6.0
       version: 0.6.0
@@ -205,6 +208,9 @@ importers:
 
   .:
     devDependencies:
+      '@microsoft/tui-test':
+        specifier: 'catalog:'
+        version: 0.1.0
       '@types/node':
         specifier: 'catalog:'
         version: 26.5.1
@@ -380,6 +386,21 @@ importers:
         specifier: 'catalog:'
         version: 26.5.1
 
+  spikes/uniview-tui:
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 26.5.1
+      '@types/react':
+        specifier: 'catalog:'
+        version: 19.3.0
+      '@uniview/tui-react':
+        specifier: 0.0.3
+        version: 0.0.3(react@19.3.0)
+      react:
+        specifier: 'catalog:'
+        version: 19.3.0
+
 packages:
 
   '@esbuild/aix-ppc64@0.28.2':
@@ -546,6 +567,56 @@ packages:
 
   '@jridgewell/sourcemap-codec@1.6.0':
     resolution: {integrity: sha512-T7jf+5zgsZHwNJ4lvQ7/aezbyk0nNX+zJVWpmHA7VYsEx7a7qr5Rg5IbtJFqkgze5Y2sruq1RUY8Q837Od7iFw==}
+
+  '@microsoft/tui-test-darwin-arm64@0.1.0':
+    resolution: {integrity: sha512-yhy3AwPzuoONthY2+3EolvoHF/RYc5BPIFQkcmWdpPmzRl14yNTtGuBofJ+upOoZC6WRg42JHm8Uc3y4OZJx3g==}
+    engines: {node: '>=20'}
+    cpu: [arm64]
+    os: [darwin]
+
+  '@microsoft/tui-test-darwin-x64@0.1.0':
+    resolution: {integrity: sha512-dSf8V4zdTDkliderHD8DCganNrKfztUdV7diXM3qP33nA/rJyqRrlOWmdggKfnca4fJt0h7/mlKO3DOS8rF8Mw==}
+    engines: {node: '>=20'}
+    cpu: [x64]
+    os: [darwin]
+
+  '@microsoft/tui-test-linux-arm64-gnu@0.1.0':
+    resolution: {integrity: sha512-nbEF8qWjiqtyhvYHubG+Avznx6dHpaOePC5BrMme1He90tNiFajFFAZUOpXYcQWYaEdR29hxdb2V3DF4BjOgag==}
+    engines: {node: '>=20'}
+    cpu: [arm64]
+    os: [linux]
+    libc: [glibc]
+
+  '@microsoft/tui-test-linux-arm64-musl@0.1.0':
+    resolution: {integrity: sha512-Te0uRVpFu+TyDzYDNp5UqMEEFpHYa21n0LDFR7HAlWSdWlD4fu6W4xRkzm/T8aWHdiJke6vZHBTIAjMcaCGejw==}
+    engines: {node: '>=20'}
+    cpu: [arm64]
+    os: [linux]
+    libc: [musl]
+
+  '@microsoft/tui-test-linux-x64-gnu@0.1.0':
+    resolution: {integrity: sha512-BHAtqIH/V00AWy7Zcef7s11XTzNCkz/BPR7rd3Mv+0axiHcjRI/ceCzuVJDnk8kd4ZO7RAxlpxYd43HWmvj3sw==}
+    engines: {node: '>=20'}
+    cpu: [x64]
+    os: [linux]
+    libc: [glibc]
+
+  '@microsoft/tui-test-linux-x64-musl@0.1.0':
+    resolution: {integrity: sha512-xIBbZH/rHyzlBGn7//VJbCaGcwRZdHJrBs6/2vbRnN+TDAd7XdNplPdGxJ0fjIDcgDedRNWaoaIV5JYmerNkqA==}
+    engines: {node: '>=20'}
+    cpu: [x64]
+    os: [linux]
+    libc: [musl]
+
+  '@microsoft/tui-test-win32-x64-msvc@0.1.0':
+    resolution: {integrity: sha512-BmgGrH7WdxAWUYakENpofKnPmtHG2scqghWk6BtTIMGE8aYaLFJhVuEQVQYBDdQXQhXrT627XfUrv3kOIc7vpw==}
+    engines: {node: '>=20'}
+    cpu: [x64]
+    os: [win32]
+
+  '@microsoft/tui-test@0.1.0':
+    resolution: {integrity: sha512-nzIzoV8nFJjzzLVxoqxAdBAK+hhs10bGdgNNgp0rm5brJ1GXfYPwf4xMzL1FHRT2EV6zQmMykfLbxDhSeyQ8jg==}
+    engines: {node: '>=20'}
 
   '@opentui/core-darwin-arm64@0.6.0':
     resolution: {integrity: sha512-goKEmysr/DzbJDQCfUaYPsNU1Ztt3+pUb2eLV/aUmmOSlnkOytI7R1Z7qNtiy8bkbc56XySAuUO9Jjp3egX2Bw==}
@@ -746,14 +817,30 @@ packages:
   '@types/estree@1.0.9':
     resolution: {integrity: sha512-GhdPgy1el4/ImP05X05Uw4cw2/M93BCUmnEvWZNStlCzEKME4Fkk+YpoA5OiHNQmoS7Cafb8Xa3Pya8m1Qrzeg==}
 
+  '@types/hast@3.0.5':
+    resolution: {integrity: sha512-rp/ezSWaD1m44dPKICGhiskI13nVr7qTloFwDa/IYkhhf5nzwP+zIQcIJh3WIFSBOy/H1PzB40jPjMDksN4F+g==}
+
   '@types/node@26.5.1':
     resolution: {integrity: sha512-CzNm2FezW4VR/LjG6yUdiEgLE/rAQ9Slj5gCu/C2VrdcW7I0ahNZ8DRbHT7zOZ6r3ONgd/bsQIeSaoDGrd1C6g==}
 
   '@types/react@19.3.0':
     resolution: {integrity: sha512-N0rFCuH9YoxG9/m61l9MfpJKfmLOVU0em7ipIz6TRgSSkvReLB9vL85GB+yr8Bs5leqpvg96JSwF4ZS1s4viQg==}
 
+  '@types/unist@3.0.3':
+    resolution: {integrity: sha512-ko/gIFJRv177XgZsZcBwnqJN5x/Gien8qNOn0D5bQU/zAzVf9Zt3BlcUiLqhV9y4ARk0GbT3tnUiPNgnTXzc/Q==}
+
   '@types/vscode@1.90.0':
     resolution: {integrity: sha512-oT+ZJL7qHS9Z8bs0+WKf/kQ27qWYR3trsXpq46YDjFqBsMLG4ygGGjPaJ2tyrH0wJzjOEmDyg9PDJBBhWg9pkQ==}
+
+  '@uniview/tui-core@0.0.3':
+    resolution: {integrity: sha512-DPP6QyedDSfU/HkQTU8lvwPxf0AxjLqXazcuitlDVr3N35glg+9h6RDqMI3lAEjgdmvUx/pAVIjPaD0UOcieiQ==}
+    engines: {node: '>=18'}
+
+  '@uniview/tui-react@0.0.3':
+    resolution: {integrity: sha512-k62Z14U3Qjv1lJso9cqjM+q5uW7zI6wI6fwnnvZY7qd67DrtmYTh7ybHDDtrisYofEA/8wT7gVc7XGTyJPZG9g==}
+    engines: {node: '>=18'}
+    peerDependencies:
+      react: ^19.2.0
 
   '@vitest/expect@4.1.11':
     resolution: {integrity: sha512-VX2x5vNJXET47KAFzwERI+KRMtTTCSWTfSMKsW7JsUsXV4psq++e3DvZpuTDOpHcxytiDs6p2nhVb2tVDiiUYw==}
@@ -807,9 +894,16 @@ packages:
   csstype@3.2.3:
     resolution: {integrity: sha512-z1HGKcYy2xA8AGQfwrn0PAy+PB7X/GSj3UVJW9qKyn43xWa+gl5nXmU4qqLMRzWVLFC8KusUX8T/0kCiOYpAIQ==}
 
+  dequal@2.0.3:
+    resolution: {integrity: sha512-0je+qPKHEMohvfRTCEo3CrPG6cAzAYgmzKyxRiYSSDkS6eGJdyVJm7WaYA5ECaAD9wLB2T4EEeymA5aFVcYXCA==}
+    engines: {node: '>=6'}
+
   detect-libc@2.1.2:
     resolution: {integrity: sha512-Btj2BOOO83o3WyH59e8MgXsxEQVcarkUOpEYrubB0urwnN10yQ364rsiByU11nZlqWYZm05i/of7io4mzihBtQ==}
     engines: {node: '>=8'}
+
+  devlop@1.1.0:
+    resolution: {integrity: sha512-RWmIqhcFf1lRYBvNmr7qTNuyCt/7/ns2jbpp1+PalgE/rDQcBT0fioSMUpJ93irlUhC5hrg4cYqe6U+0ImW0rA==}
 
   diff@9.0.0:
     resolution: {integrity: sha512-svtcdpS8CgJyqAjEQIXdb3OjhFVVYjzGAPO8WGCmRbrml64SPw/jJD4GoE98aR7r25A0XcgrK3F02yw9R/vhQw==}
@@ -850,6 +944,10 @@ packages:
   get-east-asian-width@1.7.0:
     resolution: {integrity: sha512-XjH1AECxf0giL2V1aU8vKyRR2ppRUb5c0EvT7zuJTokQ74bNo52zOtghqdWIqrhUD79fo3x0WfKZdOqxF6LG1Q==}
     engines: {node: '>=18'}
+
+  highlight.js@11.11.2:
+    resolution: {integrity: sha512-oaXMACAU0kzOMXBjWpNcX+vlwSBCIAiZ9BHa7gA15NOTtT2L/l8OSZDuqS2XppOhZBPJ7hm4o8ep2kyuip2uEQ==}
+    engines: {node: '>=12.0.0'}
 
   hono@4.13.8:
     resolution: {integrity: sha512-/Gng7NfoykZl2pjukW5Z6+8Yxm3BPRf86GTbQnt0SbySkvax4fyL4H3HhY1cCpBGmiW9XDRFzRV+CXK2W8QudQ==}
@@ -929,8 +1027,16 @@ packages:
     resolution: {integrity: sha512-WkUDrojuJs0xkgGf2udWxa3yGBRxPtxUkB79i6aCZLRgc7PM8fZe9TosfPDcvEpQZbuFASnHYmRLBLUbmLOIIA==}
     engines: {node: '>= 12.0.0'}
 
+  lowlight@3.3.0:
+    resolution: {integrity: sha512-0JNhgFoPvP6U6lE/UdVsSq99tn6DhjjpAj5MxG49ewd2mOBVtwWYIT8ClyABhq198aXXODMU6Ox8DrGy/CpTZQ==}
+
   magic-string@0.30.21:
     resolution: {integrity: sha512-vd2F4YUyEXKGcLHoq+TEyCjxueSeHnFxyyjNp80yg0XV4vUhnDer/lvvlqM/arB5bXQN5K2/3oinyCRyx8T2CQ==}
+
+  marked@15.0.12:
+    resolution: {integrity: sha512-8dD6FusOQSrpv9Z1rdNMdlSgQOIP880DHqnohobOmYLElGEqAL/JvxvuxZO16r4HtjTlfPRDC1hbvxC9dPN2nA==}
+    engines: {node: '>= 18'}
+    hasBin: true
 
   marked@17.0.1:
     resolution: {integrity: sha512-boeBdiS0ghpWcSwoNm/jJBwdpFaMnZWRzjA6SkUMYb40SVaN1x7mmfGKp0jvexGcx+7y2La5zRZsYFZI6Qpypg==}
@@ -1159,6 +1265,9 @@ packages:
       utf-8-validate:
         optional: true
 
+  yoga-layout@3.2.1:
+    resolution: {integrity: sha512-0LPOt3AxKqMdFBZA3HBAt/t/8vIKq7VaQYbuA8WxCgung+p9TVyKRYdpvCb80HcdTN2NkbIKbhNwKUfm3tQywQ==}
+
   zod@4.6.5:
     resolution: {integrity: sha512-v5l/aFXZQeai4awLbOpSoHecE9UiMrnfx75tEXLjNonXVARxQ5mOeipTjROUchszUNCqnE+hqAMujRsRHsut2Q==}
 
@@ -1247,6 +1356,37 @@ snapshots:
       hono: 4.13.8
 
   '@jridgewell/sourcemap-codec@1.6.0': {}
+
+  '@microsoft/tui-test-darwin-arm64@0.1.0':
+    optional: true
+
+  '@microsoft/tui-test-darwin-x64@0.1.0':
+    optional: true
+
+  '@microsoft/tui-test-linux-arm64-gnu@0.1.0':
+    optional: true
+
+  '@microsoft/tui-test-linux-arm64-musl@0.1.0':
+    optional: true
+
+  '@microsoft/tui-test-linux-x64-gnu@0.1.0':
+    optional: true
+
+  '@microsoft/tui-test-linux-x64-musl@0.1.0':
+    optional: true
+
+  '@microsoft/tui-test-win32-x64-msvc@0.1.0':
+    optional: true
+
+  '@microsoft/tui-test@0.1.0':
+    optionalDependencies:
+      '@microsoft/tui-test-darwin-arm64': 0.1.0
+      '@microsoft/tui-test-darwin-x64': 0.1.0
+      '@microsoft/tui-test-linux-arm64-gnu': 0.1.0
+      '@microsoft/tui-test-linux-arm64-musl': 0.1.0
+      '@microsoft/tui-test-linux-x64-gnu': 0.1.0
+      '@microsoft/tui-test-linux-x64-musl': 0.1.0
+      '@microsoft/tui-test-win32-x64-msvc': 0.1.0
 
   '@opentui/core-darwin-arm64@0.6.0':
     optional: true
@@ -1381,6 +1521,10 @@ snapshots:
 
   '@types/estree@1.0.9': {}
 
+  '@types/hast@3.0.5':
+    dependencies:
+      '@types/unist': 3.0.3
+
   '@types/node@26.5.1':
     dependencies:
       undici-types: 8.9.0
@@ -1389,7 +1533,27 @@ snapshots:
     dependencies:
       csstype: 3.2.3
 
+  '@types/unist@3.0.3': {}
+
   '@types/vscode@1.90.0': {}
+
+  '@uniview/tui-core@0.0.3':
+    dependencies:
+      get-east-asian-width: 1.7.0
+      yoga-layout: 3.2.1
+
+  '@uniview/tui-react@0.0.3(react@19.3.0)':
+    dependencies:
+      '@uniview/tui-core': 0.0.3
+      lowlight: 3.3.0
+      marked: 15.0.12
+      react: 19.3.0
+      react-reconciler: 0.33.0(react@19.3.0)
+    optionalDependencies:
+      react-devtools-core: 7.0.1
+    transitivePeerDependencies:
+      - bufferutil
+      - utf-8-validate
 
   '@vitest/expect@4.1.11':
     dependencies:
@@ -1446,7 +1610,13 @@ snapshots:
 
   csstype@3.2.3: {}
 
+  dequal@2.0.3: {}
+
   detect-libc@2.1.2: {}
+
+  devlop@1.1.0:
+    dependencies:
+      dequal: 2.0.3
 
   diff@9.0.0: {}
 
@@ -1497,6 +1667,8 @@ snapshots:
     optional: true
 
   get-east-asian-width@1.7.0: {}
+
+  highlight.js@11.11.2: {}
 
   hono@4.13.8: {}
 
@@ -1549,9 +1721,17 @@ snapshots:
       lightningcss-win32-arm64-msvc: 1.33.0
       lightningcss-win32-x64-msvc: 1.33.0
 
+  lowlight@3.3.0:
+    dependencies:
+      '@types/hast': 3.0.5
+      devlop: 1.1.0
+      highlight.js: 11.11.2
+
   magic-string@0.30.21:
     dependencies:
       '@jridgewell/sourcemap-codec': 1.6.0
+
+  marked@15.0.12: {}
 
   marked@17.0.1: {}
 
@@ -1704,5 +1884,7 @@ snapshots:
   ws@7.5.13: {}
 
   ws@8.22.0: {}
+
+  yoga-layout@3.2.1: {}
 
   zod@4.6.5: {}

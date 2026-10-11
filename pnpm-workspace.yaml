@@ -3,10 +3,13 @@ packages:
   - "packages/*"
   - "integrations/*"
   - "tests/*"
+  # Experimental spikes only; never shipped, never imported by apps/.
+  - "spikes/*"
 
 # Every dependency version lives here so a package.json can only ask for a name.
 # Bumping a version means editing this file, which shows up in the task's own commit.
 catalog:
+  "@microsoft/tui-test": 0.1.0
   "@opentui/core": 0.6.0
   "@opentui/react": 0.6.0
   "@types/node": 26.5.1
