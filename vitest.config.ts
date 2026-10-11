@@ -20,10 +20,11 @@ export default defineConfig({
       "vscode-ssh-tunnel/supervisor": `${root}integrations/vscode/src/supervisor.ts`,
       "vscode-ssh-tunnel/tree": `${root}integrations/vscode/src/tree.ts`,
       "@ssh-tunnel/uniview-spike/spike": `${root}spikes/uniview-tui/src/spike.tsx`,
+      "@ssh-tunnel/tui/view": `${root}apps/tui/src/view.tsx`,
     },
   },
   test: {
-    include: ["tests/**/*.test.ts", "tests/**/*.test.tsx", "packages/*/src/**/*.test.ts", "spikes/*/src/**/*.test.tsx"],
+    include: ["tests/**/*.test.ts", "tests/**/*.test.tsx", "packages/*/src/**/*.test.ts", "apps/*/src/**/*.test.tsx", "spikes/*/src/**/*.test.tsx"],
     // e2e needs a real TTY (skipped in sandboxes); `pnpm test:e2e` runs it.
     exclude: ["**/node_modules/**", "**/.git/**", "tests/e2e/**"],
   },

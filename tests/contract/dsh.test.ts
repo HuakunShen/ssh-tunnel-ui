@@ -120,6 +120,18 @@ describe("dsh plugin host half", () => {
     expect((JSON.parse(health.body) as { ok: boolean }).ok).toBe(true);
   });
 
+  it("serves the panel document shell instead of 404", async () => {
+    const { routes, apply: run } = makeContext();
+    run();
+    const handler = routes[0]?.handler;
+    if (handler === undefined) throw new Error("no handler registered");
+
+    // The frame URL from /dsh/context must resolve to a document.
+    const doc = await call(handler, "/ssh-tunnel/");
+    expect(doc.status).toBe(200);
+    expect(doc.body).toContain("<!doctype html>");
+  });
+
   it("proxies profile CRUD to the in-process manager", async () => {
     const { routes, apply: run } = makeContext();
     run();

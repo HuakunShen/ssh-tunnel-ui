@@ -34,6 +34,13 @@ const e2e = describe.skipIf(!canOpenPty() || !existsSync(tuiBundle));
 
 e2e("tui e2e (tui-test, real terminal)", async () => {
   const { TuiTest } = await import("@microsoft/tui-test");
+  const { mkdirSync, writeFileSync } = await import("node:fs");
+
+  function saveShot(name: string, svg: string): void {
+    const dir = join(root, "screenshots");
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, name), svg);
+  }
 
   it("boots without the dual-React hooks crash and lists tunnels", async () => {
     const terminal = TuiTest.ephemeral("tui-boot");
@@ -47,6 +54,8 @@ e2e("tui e2e (tui-test, real terminal)", async () => {
       const text = await terminal.text();
       expect(text).not.toMatch(/Cannot read properties of null/);
       await terminal.getByText("ssh-tunnel", { full: false }).expect({ timeout: 15000 });
+      await terminal.waitIdle({ timeout: 10000 });
+      saveShot("tui-list.svg", await terminal.screenshot());
     } finally {
       await terminal.closeQuiet();
     }
@@ -68,6 +77,26 @@ e2e("tui e2e (tui-test, real terminal)", async () => {
       await terminal.waitIdle({ timeout: 15000 });
       const text = await terminal.text();
       expect(text).not.toMatch(/Cannot read properties of null/);
+    } finally {
+      await terminal.closeQuiet();
+    }
+  });
+
+  it("opens the creation form with n and cancels with Escape", async () => {
+    const terminal = TuiTest.ephemeral("tui-new");
+    try {
+      await terminal.run(`node ${tuiBundle} --daemon=http://127.0.0.1:7432`, {
+        cols: 100,
+        rows: 36,
+      });
+      await terminal.getByText("ssh-tunnel", { full: false }).expect({ timeout: 15000 });
+      await terminal.keyboard.press("n");
+      await terminal.getByText("new tunnel", { full: false }).expect({ timeout: 10000 });
+      await terminal.getByText("SSH target", { full: false }).expect({ timeout: 10000 });
+      await terminal.keyboard.press("Escape");
+      await terminal.getByText("new tunnel").wait({ state: "hidden", timeout: 10000 });
+      await terminal.waitIdle({ timeout: 10000 });
+      saveShot("tui-new-form.svg", await terminal.screenshot());
     } finally {
       await terminal.closeQuiet();
     }

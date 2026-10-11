@@ -40,3 +40,10 @@ Date: 2026-10-11. Published package `@uniview/tui-react@0.0.3` evaluated via
 - If migrating: port `apps/tui` to uniview components, keep the daemon/HTTP
   API identical, and keep `@microsoft/tui-test` e2e as the cross-backend
   adjudicator (same keypresses → same pixels).
+- Owner feedback from this round lives in `docs/uniview-feedback.md`
+  (StatusItem rename note, `onSelect` trigger source, changelog ask).
+- Highlight-overflow note: the "selected row exceeds the box" artifact was
+  our OpenTUI usage bug (text-level `bg` paints per glyph run), fixed by
+  moving the background to the row `box` — not a renderer limitation on
+  either side. uniview's `List` gets full-row highlight for free via
+  `selectedBackground`; OpenTUI needs the box wrapper (now in `view.tsx`).
