@@ -37,6 +37,9 @@ buildSync({
   banner: { js: "#!/usr/bin/env node" },
   loader: { ".tsx": "tsx", ".ts": "ts" },
   jsx: "automatic",
+  // Ship production React/reconciler builds: without this, the bundle runs
+  // development builds (slow, noisy) because NODE_ENV is unset at runtime.
+  define: { "process.env.NODE_ENV": '"production"' },
   // OpenTUI's native render library is platform-specific and loaded via a
   // dynamic import at runtime. If @opentui/* is bundled, that import resolves
   // from the bundle location and misses the native package (which lives as a
@@ -44,9 +47,15 @@ buildSync({
   // it loads from its real location and finds its own native sibling — the
   // TUI bundle thus needs apps/tui/node_modules at runtime (like a vite SSR
   // build), while server/cli stay zero-dependency single files.
+  //
+  // `react` MUST stay external too: bundling it creates a second copy with
+  // its own hooks dispatcher, while @opentui/react's reconciler drives the
+  // node_modules copy — App's useState then reads `null` and crashes at
+  // startup ("Cannot read properties of null (reading 'useState')").
   external:
     target === "tui"
       ? [
+          "react",
           "@opentui/core",
           "@opentui/react",
           "@opentui/core-darwin-arm64",
