@@ -13,17 +13,8 @@
         muted: "bg-muted text-muted-foreground",
         outline: "border-border text-foreground",
       },
-      glow: {
-        true: "",
-        false: "",
-      },
     },
-    compoundVariants: [
-      { variant: "success", glow: true, class: "shadow-[0_0_10px_1px_rgb(52_211_153/0.45)]" },
-      { variant: "warning", glow: true, class: "shadow-[0_0_10px_1px_rgb(251_191_36/0.45)]" },
-      { variant: "danger", glow: true, class: "shadow-[0_0_10px_1px_rgb(248_113_113/0.45)]" },
-    ],
-    defaultVariants: { variant: "default", glow: false },
+    defaultVariants: { variant: "default" },
   });
 
   export type BadgeVariant = VariantProps<typeof badgeVariants>["variant"];
@@ -38,22 +29,20 @@
     href,
     class: className,
     variant = "default",
-    glow = false,
     children,
     ...restProps
   }: WithElementRef<HTMLAnchorAttributes> & {
     variant?: BadgeVariant;
-    glow?: boolean;
   } = $props();
 </script>
 
 {#if href !== undefined}
-  <a bind:this={ref} data-slot="badge" class={cn(badgeVariants({ variant, glow }), className)} {href} {...restProps}>
+  <a bind:this={ref} data-slot="badge" class={cn(badgeVariants({ variant }), className)} {href} {...restProps}>
     {@render children?.()}
   </a>
 {:else}
   {@const spanProps = restProps as unknown as Record<string, unknown>}
-  <span bind:this={ref} data-slot="badge" class={cn(badgeVariants({ variant, glow }), className)} {...spanProps}>
+  <span bind:this={ref} data-slot="badge" class={cn(badgeVariants({ variant }), className)} {...spanProps}>
     {@render children?.()}
   </span>
 {/if}

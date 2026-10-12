@@ -36,11 +36,11 @@
 
   const dotClass = $derived(
     status === "running"
-      ? "bg-signal-running shadow-[0_0_12px_2px_rgb(52_211_153/0.6)]"
+      ? "bg-signal-running"
       : status === "degraded"
-        ? "bg-signal-degraded shadow-[0_0_12px_2px_rgb(251_191_36/0.6)]"
+        ? "bg-signal-degraded"
         : status === "failed"
-          ? "bg-signal-failed shadow-[0_0_12px_2px_rgb(248_113_113/0.6)]"
+          ? "bg-signal-failed"
           : status === "starting" || status === "stopping"
             ? "bg-signal-starting animate-pulse"
             : "bg-signal-idle",
@@ -79,7 +79,7 @@
       <div class="flex flex-wrap items-center gap-2">
         <h3 class="truncate text-[15px] font-semibold tracking-tight">{profile.name}</h3>
         <Badge variant="default">{modeBadge}</Badge>
-        <Badge variant={statusVariant} glow={status === "running" || status === "failed" || status === "degraded"}>{status}</Badge>
+        <Badge variant={statusVariant} >{status}</Badge>
       </div>
       <p class="mt-1 truncate font-mono text-xs text-muted-foreground">
         {profile.sshTarget}{#if profile.jumpHops?.length}{" "}<span class="opacity-70">via {profile.jumpHops.join(", ")}</span>{/if}

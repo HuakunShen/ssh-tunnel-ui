@@ -155,7 +155,7 @@
         <Activity class="text-cyan-400" size={24} />
         SSH Tunnel
       </h1>
-      <p class="mt-1 text-sm text-slate-400">Remember every tunnel · one click to apply · one click to stop</p>
+      <p class="mt-1 text-sm text-muted-foreground">Remember every tunnel · one click to apply · one click to stop</p>
     </div>
     <span class="flex-1"></span>
     <div class="flex items-center gap-2 font-mono text-xs">
@@ -163,9 +163,9 @@
       {#if failed > 0}
         <span class="rounded-full bg-red-500/10 px-2.5 py-1 text-red-300">{failed} failed</span>
       {/if}
-      <span class="rounded-full bg-white/5 px-2.5 py-1 text-slate-400">{store.profiles.length} tunnels</span>
+      <span class="rounded-full bg-muted px-2.5 py-1 text-muted-foreground">{store.profiles.length} tunnels</span>
     </div>
-    <div class="flex items-center gap-1.5 text-xs {store.connected ? 'text-emerald-300' : 'text-slate-500'}">
+    <div class="flex items-center gap-1.5 text-xs {store.connected ? 'text-signal-running' : 'text-muted-foreground'}">
       {#if store.connected}<Wifi size={14} />{:else}<WifiOff size={14} />{/if}
       {store.connected ? "connected" : store.loading ? "connecting…" : "offline"}
     </div>
@@ -175,7 +175,7 @@
   <div class="my-4 flex flex-wrap gap-2">
     <button
       onclick={openCreate}
-      class="inline-flex items-center gap-1.5 rounded-xl bg-cyan-500 px-4 py-2 text-sm font-medium text-slate-950 transition hover:bg-cyan-400"
+      class="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:bg-primary/85"
     ><Plus size={16} /> New tunnel</button>
     <button
       onclick={stopAll}
@@ -183,11 +183,11 @@
     ><CircleStop size={16} /> Stop all</button>
     <button
       onclick={refresh}
-      class="inline-flex items-center gap-1.5 rounded-xl border border-white/10 px-4 py-2 text-sm text-slate-300 transition hover:bg-white/5"
+      class="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-4 py-2 text-sm transition hover:bg-muted"
     ><RefreshCw size={16} /> Refresh</button>
     <span class="flex-1"></span>
     {#if store.hosts.length}
-      <span class="self-center font-mono text-xs text-slate-500">{store.hosts.length} ssh hosts</span>
+      <span class="self-center font-mono text-xs text-muted-foreground">{store.hosts.length} ssh hosts</span>
     {/if}
   </div>
 
@@ -197,11 +197,11 @@
 
   <!-- Grid -->
   {#if store.profiles.length === 0 && !store.loading}
-    <div class="rounded-2xl border border-dashed border-white/15 px-6 py-16 text-center">
-      <SquareTerminal class="mx-auto text-slate-600" size={36} />
+    <div class="rounded-[10px] border border-dashed border-border px-6 py-16 text-center">
+      <SquareTerminal class="mx-auto text-muted-foreground" size={36} />
       <p class="mt-3 font-medium">No tunnels yet</p>
-      <p class="mt-1 text-sm text-slate-400">Create one — your SSH aliases are suggested in the target field.</p>
-      <button onclick={openCreate} class="mt-4 rounded-xl bg-cyan-500 px-4 py-2 text-sm font-medium text-slate-950 hover:bg-cyan-400">
+      <p class="mt-1 text-sm text-muted-foreground">Create one — your SSH aliases are suggested in the target field.</p>
+      <button onclick={openCreate} class="mt-4 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/85">
         + New tunnel
       </button>
     </div>
@@ -224,8 +224,8 @@
   {/if}
 
   {#if store.hosts.length}
-    <details class="mt-6 text-sm text-slate-500">
-      <summary class="cursor-pointer hover:text-slate-300">SSH hosts from ~/.ssh/config</summary>
+    <details class="mt-6 text-sm text-muted-foreground">
+      <summary class="cursor-pointer hover:text-foreground">SSH hosts from ~/.ssh/config</summary>
       <p class="mt-2 font-mono text-xs">{store.hosts.map((h) => h.alias + (h.hostName ? ` (${h.hostName})` : "")).join(" · ")}</p>
     </details>
   {/if}
@@ -244,13 +244,13 @@
 {#if inspectOpen}
   <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm" role="presentation" tabindex="-1" onclick={() => (inspectOpen = false)} onkeydown={(e) => e.key === "Escape" && (inspectOpen = false)}>
     <div role="dialog" aria-modal="true" aria-label="Exact ssh command" tabindex="-1"
-      class="w-full max-w-2xl rounded-2xl border border-white/10 bg-slate-900 p-6 shadow-2xl"
+      class="w-full max-w-2xl rounded-[10px] border border-border bg-popover p-6 shadow-[0_8px_30px_rgb(0_0_0/0.18)]"
       onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()}>
       <h2 class="text-lg font-semibold tracking-tight">Exact ssh command</h2>
-      <p class="mt-1 text-xs text-slate-500">This is precisely what the daemon spawns — learn the flags by seeing them.</p>
+      <p class="mt-1 text-xs text-muted-foreground">This is precisely what the daemon spawns — learn the flags by seeing them.</p>
       <pre class="mt-3 overflow-x-auto rounded-xl bg-black/40 p-4 font-mono text-xs leading-relaxed text-emerald-200">{inspectCommand ?? ""}</pre>
       <div class="mt-4 flex justify-end">
-        <button onclick={() => (inspectOpen = false)} class="rounded-lg px-4 py-2 text-sm text-slate-300 hover:bg-white/10">Close</button>
+        <button onclick={() => (inspectOpen = false)} class="rounded-lg px-4 py-2 text-sm hover:bg-muted">Close</button>
       </div>
     </div>
   </div>

@@ -10,8 +10,12 @@
   // never stores a preference (no backend for it).
   onMount(() => {
     const dark = window.matchMedia("(prefers-color-scheme: dark)");
+    const params = new URLSearchParams(window.location.search);
+    const themeParam = params.get("theme");
     const apply = (): void => {
-      document.documentElement.classList.toggle("dark", dark.matches);
+      // `?theme=dark|light` overrides the OS for screenshots and e2e.
+      const isDark = themeParam === "dark" ? true : themeParam === "light" ? false : dark.matches;
+      document.documentElement.classList.toggle("dark", isDark);
       const platform =
         navigator.userAgent.includes("Mac") ? "macos"
         : navigator.userAgent.includes("Windows") ? "windows"

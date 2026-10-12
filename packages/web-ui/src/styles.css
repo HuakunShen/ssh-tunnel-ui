@@ -16,58 +16,60 @@
 
 @layer base {
   :root {
-    --radius: 0.625rem;
-    --background: oklch(0.98 0.005 250);
-    --foreground: oklch(0.18 0.02 250);
-    --card: oklch(1 0 0);
-    --card-foreground: oklch(0.18 0.02 250);
-    --popover: oklch(1 0 0);
-    --popover-foreground: oklch(0.18 0.02 250);
-    --primary: oklch(0.62 0.15 200);
-    --primary-foreground: oklch(0.99 0 0);
-    --secondary: oklch(0.94 0.01 250);
-    --secondary-foreground: oklch(0.25 0.02 250);
-    --muted: oklch(0.94 0.01 250);
-    --muted-foreground: oklch(0.5 0.02 250);
-    --accent: oklch(0.94 0.01 250);
-    --accent-foreground: oklch(0.25 0.02 250);
-    --destructive: oklch(0.577 0.245 27.325);
-    --border: oklch(0.9 0.01 250);
-    --input: oklch(0.9 0.01 250);
-    --ring: oklch(0.62 0.15 200);
-    /* Tunnel signal palette (status dots, badges). */
-    --signal-running: #10b981;
-    --signal-degraded: #f59e0b;
-    --signal-failed: #ef4444;
-    --signal-idle: #64748b;
-    --signal-starting: #06b6d4;
+    /* Mac-native light: flat sidebar grays, hairline borders, SF blue accent.
+       No glows, no gradients — contrast comes from weight + gray steps. */
+    --radius: 0.5rem;
+    --background: #f5f5f7;
+    --foreground: #1d1d1f;
+    --card: #ffffff;
+    --card-foreground: #1d1d1f;
+    --popover: #ffffff;
+    --popover-foreground: #1d1d1f;
+    --primary: #0a84ff;
+    --primary-foreground: #ffffff;
+    --secondary: #e8e8ed;
+    --secondary-foreground: #1d1d1f;
+    --muted: #f5f5f7;
+    --muted-foreground: #6e6e73;
+    --accent: #e8e8ed;
+    --accent-foreground: #1d1d1f;
+    --destructive: #ff3b30;
+    --border: #d2d2d7;
+    --input: #ffffff;
+    --ring: #0a84ff;
+    /* Tunnel signal palette: SF system colors, flat dots, no glow. */
+    --signal-running: #30d158;
+    --signal-degraded: #ff9f0a;
+    --signal-failed: #ff453a;
+    --signal-idle: #8e8e93;
+    --signal-starting: #0a84ff;
     color-scheme: light;
   }
 
   .dark {
-    --background: oklch(0.13 0.015 250);
-    --foreground: oklch(0.93 0.01 250);
-    --card: oklch(0.17 0.015 250);
-    --card-foreground: oklch(0.93 0.01 250);
-    --popover: oklch(0.17 0.015 250);
-    --popover-foreground: oklch(0.93 0.01 250);
-    --primary: oklch(0.72 0.14 200);
-    --primary-foreground: oklch(0.13 0.015 250);
-    --secondary: oklch(0.24 0.015 250);
-    --secondary-foreground: oklch(0.93 0.01 250);
-    --muted: oklch(0.24 0.015 250);
-    --muted-foreground: oklch(0.65 0.015 250);
-    --accent: oklch(0.24 0.015 250);
-    --accent-foreground: oklch(0.93 0.01 250);
-    --destructive: oklch(0.704 0.191 22.216);
-    --border: oklch(1 0 0 / 10%);
-    --input: oklch(1 0 0 / 12%);
-    --ring: oklch(0.72 0.14 200);
-    --signal-running: #34d399;
-    --signal-degraded: #fbbf24;
-    --signal-failed: #f87171;
-    --signal-idle: #64748b;
-    --signal-starting: #22d3ee;
+    --background: #1e1e1e;
+    --foreground: #f5f5f7;
+    --card: #2c2c2e;
+    --card-foreground: #f5f5f7;
+    --popover: #2c2c2e;
+    --popover-foreground: #f5f5f7;
+    --primary: #0a84ff;
+    --primary-foreground: #ffffff;
+    --secondary: #3a3a3c;
+    --secondary-foreground: #f5f5f7;
+    --muted: #2c2c2e;
+    --muted-foreground: #98989d;
+    --accent: #3a3a3c;
+    --accent-foreground: #f5f5f7;
+    --destructive: #ff453a;
+    --border: #38383a;
+    --input: #1c1c1e;
+    --ring: #0a84ff;
+    --signal-running: #30d158;
+    --signal-degraded: #ffd60a;
+    --signal-failed: #ff453a;
+    --signal-idle: #636366;
+    --signal-starting: #64d2ff;
     color-scheme: dark;
   }
 }

@@ -18,7 +18,7 @@
   bind:this={ref}
   data-slot="card"
   class={cn(
-    "macos:rounded-[10px] macos:shadow-[0_1px_4px_rgb(0_0_0/0.28),inset_0_1px_0_rgb(255_255_255/0.06)] rounded-2xl border border-white/10 bg-card text-card-foreground shadow-[0_8px_30px_rgb(0_0_0/0.25)] backdrop-blur transition-colors",
+    "macos:rounded-[10px] rounded-[10px] border border-border bg-card text-card-foreground shadow-[0_1px_2px_rgb(0_0_0/0.06)] transition-colors",
     className,
   )}
   {...restProps}

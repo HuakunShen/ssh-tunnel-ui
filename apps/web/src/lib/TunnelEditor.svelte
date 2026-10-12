@@ -115,7 +115,7 @@
       role="dialog"
       aria-modal="true"
       aria-label={editing ? "Edit tunnel" : "New tunnel"}
-      class="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-white/10 bg-slate-900 p-6 shadow-2xl"
+      class="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-[10px] border border-border bg-popover p-6 shadow-[0_8px_30px_rgb(0_0_0/0.18)]"
       onclick={(e) => e.stopPropagation()}
       onkeydown={(e) => e.key === "Escape" && onClose()}
       tabindex="-1"
@@ -132,22 +132,22 @@
         <label for="f-mode" class="text-muted-foreground">Mode</label>
         <div>
           <select id="f-mode" bind:value={mode}
-            class="w-full rounded-lg border border-white/10 bg-slate-800 px-3 py-2 outline-none focus:border-cyan-400/50">
+            class="w-full rounded-md border border-input bg-card px-3 py-2 text-sm outline-none focus:border-ring">
             {#each TUNNEL_MODES as m}
               <option value={m}>{m} — {modeHelp[m]}</option>
             {/each}
           </select>
-          <p class="mt-1 font-mono text-[11px] text-slate-500">
+          <p class="mt-1 font-mono text-[11px] text-muted-foreground">
             {#if mode === "local"}
-              ◉ localhost:port <span class="text-cyan-500">⟵</span> remote-host:port <span class="text-slate-600">· e.g. read remote DB as localhost:5432</span>
+              ◉ localhost:port <span class="text-primary">⟵</span> remote-host:port <span class="opacity-70">· e.g. read remote DB as localhost:5432</span>
             {:else if mode === "remote"}
-              remote-host:port <span class="text-cyan-500">⟶</span> ◉ localhost:port <span class="text-slate-600">· e.g. demo your laptop app from the server</span>
+              remote-host:port <span class="text-primary">⟶</span> ◉ localhost:port <span class="opacity-70">· e.g. demo your laptop app from the server</span>
             {:else if mode === "dynamic"}
-              ◉ localhost:port <span class="text-cyan-500">⟷</span> anywhere <span class="text-slate-600">· e.g. browse as if on the remote network</span>
+              ◉ localhost:port <span class="text-primary">⟷</span> anywhere <span class="opacity-70">· e.g. browse as if on the remote network</span>
             {:else if mode === "jump"}
-              you <span class="text-cyan-500">⟶</span> bastion <span class="text-cyan-500">⟶</span> target <span class="text-slate-600">· fill Jump hops below</span>
+              you <span class="text-primary">⟶</span> bastion <span class="text-primary">⟶</span> target <span class="opacity-70">· fill Jump hops below</span>
             {:else}
-              one SSH connection, several forwards <span class="text-slate-600">· add rows below</span>
+              one SSH connection, several forwards <span class="opacity-70">· add rows below</span>
             {/if}
           </p>
         </div>
@@ -175,7 +175,7 @@
         <span class="self-start pt-2 text-muted-foreground">Forwards</span>
         <div class="min-w-0">
           {#each forwards as f, i}
-            <div class="mb-3 rounded-xl border border-white/10 bg-white/[0.02] p-2.5">
+            <div class="mb-3 rounded-lg border border-border bg-muted/40 p-2.5">
               <!-- Type picker: three Termius-style cards instead of a -L/-R/-D flag -->
               <div class="mb-2 grid grid-cols-3 gap-1.5" role="radiogroup" aria-label={`forward ${i + 1} type`}>
                 {#each FORWARD_KINDS as k}
@@ -185,31 +185,31 @@
                     aria-checked={f.kind === k.kind}
                     onclick={() => (f.kind = k.kind)}
                     class="flex items-center gap-1.5 rounded-lg border px-2 py-1.5 text-left transition {f.kind === k.kind
-                      ? 'border-cyan-400/60 bg-cyan-400/10'
-                      : 'border-white/10 bg-transparent hover:border-white/25'}"
+                      ? 'border-ring bg-primary/10'
+                      : 'border-border bg-transparent hover:border-muted-foreground/40'}"
                   >
                     {#if k.icon === "local"}
-                      <ArrowLeftToLine size={15} class={f.kind === k.kind ? "text-cyan-300" : "text-slate-500"} />
+                      <ArrowLeftToLine size={15} class={f.kind === k.kind ? "text-primary" : "text-muted-foreground"} />
                     {:else if k.icon === "remote"}
-                      <ArrowRightToLine size={15} class={f.kind === k.kind ? "text-cyan-300" : "text-slate-500"} />
+                      <ArrowRightToLine size={15} class={f.kind === k.kind ? "text-primary" : "text-muted-foreground"} />
                     {:else}
-                      <Globe size={15} class={f.kind === k.kind ? "text-cyan-300" : "text-slate-500"} />
+                      <Globe size={15} class={f.kind === k.kind ? "text-primary" : "text-muted-foreground"} />
                     {/if}
                     <span>
-                      <span class="block text-xs font-medium {f.kind === k.kind ? 'text-cyan-200' : 'text-slate-300'}">{k.label}</span>
-                      <span class="block text-[10px] leading-tight text-slate-500">{k.hint}</span>
+                      <span class="block text-xs font-medium {f.kind === k.kind ? 'text-primary' : 'text-foreground'}">{k.label}</span>
+                      <span class="block text-[10px] leading-tight text-muted-foreground">{k.hint}</span>
                     </span>
                   </button>
                 {/each}
               </div>
               <!-- Direction sketch: which side listens, which side serves -->
-              <p class="mb-2 font-mono text-[11px] text-slate-500">
+              <p class="mb-2 font-mono text-[11px] text-muted-foreground">
                 {#if f.kind === "local"}
-                  ◉ this machine:{f.port || "port"} <span class="text-cyan-500">⟵</span> {f.host || "remote host"}:{f.targetPort || "port"} via SSH
+                  ◉ this machine:{f.port || "port"} <span class="text-primary">⟵</span> {f.host || "remote host"}:{f.targetPort || "port"} via SSH
                 {:else if f.kind === "remote"}
-                  SSH <span class="text-cyan-500">⟶</span> server:{f.port || "port"} ◉ serves {f.host || "local host"}:{f.targetPort || "port"}
+                  SSH <span class="text-primary">⟶</span> server:{f.port || "port"} ◉ serves {f.host || "local host"}:{f.targetPort || "port"}
                 {:else}
-                  ◉ SOCKS5 on this machine:{f.port || "port"} <span class="text-cyan-500">⟷</span> anywhere via SSH
+                  ◉ SOCKS5 on this machine:{f.port || "port"} <span class="text-primary">⟷</span> anywhere via SSH
                 {/if}
               </p>
               <div class="grid grid-cols-[minmax(0,1fr)_72px_minmax(0,1fr)_72px_28px] gap-1.5">
