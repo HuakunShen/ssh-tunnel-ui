@@ -266,27 +266,50 @@
     layer goes transparent so the OS material shows through, and the data
     surfaces get a solid enough tint to stay readable over any wallpaper.
   */
+  /*
+    Native material, published by the desktop host only after it really
+    installed one (`data-backdrop`). Until then the page stays opaque: a
+    translucent surface over nothing reads as a washed-out grey box.
+
+    Every surface derives its alpha from ONE knob, `--material-opacity`, so the
+    window reads as a single sheet of glass rather than a collection of panels
+    at different tints. Earlier revisions hand-tuned each surface separately and
+    the mismatch was obvious: only the content column looked transparent while
+    the sidebar and title bar stayed opaque. The one number is set from Settings
+    and remembered, and a page reload cannot desynchronise the surfaces again.
+  */
+  :root {
+    --material-opacity: 0.72;
+    /* Alpha per surface, expressed against the knob so one change moves them
+       together. These are weights, not final alphas: the effective value is
+       the knob plus whatever bias that surface needs to stay readable. */
+    --material-bias-base: 0;
+    --material-bias-chrome: 0.06;
+    --material-bias-sidebar: 0.04;
+    /* Clamp so a slider at the top still yields readable text contrast, and at
+       the bottom still yields a surface rather than a hole. */
+    --material-surface-alpha: clamp(0.42, calc(var(--material-opacity) + var(--material-bias-base)), 0.94);
+    --material-chrome-alpha: clamp(0.42, calc(var(--material-opacity) + var(--material-bias-chrome)), 0.94);
+    --material-sidebar-alpha: clamp(0.42, calc(var(--material-opacity) + var(--material-bias-sidebar)), 0.94);
+  }
+
   :root:is([data-backdrop="glass"], [data-backdrop="vibrancy"])[data-interface="macos"] {
-    --background: transparent;
-    --card: rgb(28 28 30 / 78%);
-    --sidebar: rgb(24 24 26 / 64%);
-    --chrome: rgb(20 20 22 / 68%);
-    --control: rgb(50 50 54 / 88%);
+    --background: rgb(30 31 38 / var(--material-surface-alpha));
+    --card: rgb(30 31 38 / var(--material-surface-alpha));
+    --sidebar: rgb(26 27 33 / var(--material-surface-alpha));
+    --chrome: rgb(22 23 28 / var(--material-surface-alpha));
+    --control: rgb(56 57 64 / calc(var(--material-surface-alpha) + 0.14));
   }
   :root:is([data-backdrop="glass"], [data-backdrop="vibrancy"])[data-interface="macos"].dark {
-    --card: rgb(28 28 32 / 82%);
-    --sidebar: rgb(24 25 31 / 72%);
-    --chrome: rgb(16 17 22 / 62%);
-    --control: rgb(44 45 54 / 82%);
+    --background: rgb(18 18 22 / var(--material-surface-alpha));
+    --card: rgb(30 31 38 / var(--material-surface-alpha));
+    --sidebar: rgb(24 25 31 / var(--material-surface-alpha));
+    --chrome: rgb(18 19 24 / var(--material-surface-alpha));
+    --control: rgb(48 49 58 / calc(var(--material-surface-alpha) + 0.12));
   }
-  /* The content column is the reading surface: keep it legible over a bright
-     desktop, which the desktop material cannot promise. */
-  :root:is([data-backdrop="glass"], [data-backdrop="vibrancy"])[data-interface="macos"] .tunnel-content {
-    background: rgb(18 18 20 / 86%);
-  }
-  :root:is([data-backdrop="glass"], [data-backdrop="vibrancy"])[data-interface="macos"].dark .tunnel-content {
-    background: rgb(18 18 22 / 88%);
-  }
+  /* The three regions paint from --background / --sidebar / --chrome, so the
+     single knob above reaches all of them. Re-declaring the regions here would
+     be a second source of truth that could drift out of step with the others. */
 
   /* Reduced transparency is a system setting, not a preference to ignore. */
   @media (prefers-reduced-transparency: reduce) {
@@ -304,21 +327,23 @@
     /* The native material is a system setting the user already turned off, so
        the page must not fake it back with translucent tokens. */
     :root:is([data-backdrop="glass"], [data-backdrop="vibrancy"])[data-interface="macos"] {
-      --background: #ffffff;
       --card: #f6f6f7;
       --sidebar: #eaeaec;
       --chrome: #eeeeef;
       --control: #ffffff;
     }
     :root:is([data-backdrop="glass"], [data-backdrop="vibrancy"])[data-interface="macos"].dark {
-      --background: #121216;
       --card: #1b1c21;
       --sidebar: #191a1e;
       --chrome: #14151a;
       --control: #2a2b33;
     }
-    :root:is([data-backdrop="glass"], [data-backdrop="vibrancy"])[data-interface="macos"] .tunnel-content {
-      background: var(--background);
+    :root:is([data-backdrop="glass"], [data-backdrop="vibrancy"])[data-interface="macos"] :is(
+      .tunnel-content,
+      .tunnel-sidebar,
+      .tunnel-toolbar
+    ) {
+      background: var(--card);
     }
   }
 }

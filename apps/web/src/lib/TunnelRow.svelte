@@ -195,34 +195,41 @@
       {#if copied}<Check size={14} />{:else}<Copy size={14} />{/if}
     </button>
 
-    {#if pasteable !== ""}
-      <button
-        class="toolbar-icon"
-        onclick={() => void copyEndpoint()}
-        title="Copy {pasteable} — paste it into a terminal, a browser bar, or a database client"
-        aria-label="Copy the local address"
-      >
-        {#if endpointCopied}<Check size={14} />{:else}<Link size={14} />{/if}
-      </button>
-    {/if}
+    <!--
+      Every row renders the same controls in the same order. A control with
+      nothing to act on stays in place but disabled, rather than disappearing:
+      removing it would slide every icon to its left out of alignment with the
+      rows above and below, which reads as a rendering fault.
+    -->
+    <button
+      class="toolbar-icon"
+      disabled={pasteable === ""}
+      onclick={() => void copyEndpoint()}
+      title={pasteable === ""
+        ? "This tunnel has no local address to copy"
+        : `Copy ${pasteable} — paste it into a terminal, a browser bar, or a database client`}
+      aria-label="Copy the local address"
+    >
+      {#if endpointCopied}<Check size={14} />{:else}<Link size={14} />{/if}
+    </button>
 
     <button class="toolbar-icon" disabled={busy} onclick={() => onProbe(profile.id)} title="Probe forwarded ports" aria-label="Probe forwarded ports">
       <FlaskConical size={14} />
     </button>
 
-    {#if terminals.length > 0}
-      <div class="relative">
-        <button
-          class="toolbar-icon"
-          aria-haspopup="menu"
-          aria-expanded={menuOpen}
-          onclick={(e) => { e.stopPropagation(); menuOpen = !menuOpen; }}
-          title="Open in a terminal"
-          aria-label="Open in a terminal"
-        >
-          <TerminalIcon size={14} />
-        </button>
-        {#if menuOpen}
+    <div class="relative">
+      <button
+        class="toolbar-icon"
+        disabled={terminals.length === 0}
+        aria-haspopup="menu"
+        aria-expanded={menuOpen}
+        onclick={(e) => { e.stopPropagation(); menuOpen = !menuOpen; }}
+        title={terminals.length === 0 ? "No terminal applications found" : "Open in a terminal"}
+        aria-label="Open in a terminal"
+      >
+        <TerminalIcon size={14} />
+      </button>
+      {#if menuOpen && terminals.length > 0}
           <div
             class="absolute right-0 z-20 mt-1 min-w-[184px] overflow-hidden rounded-[var(--radius)] border border-border bg-popover py-1 shadow-[0_8px_24px_rgb(0_0_0/0.18)]"
             role="menu"
@@ -239,11 +246,10 @@
                 <ExternalLink size={12} class="text-muted-foreground" />
                 <span class="flex-1 truncate">{terminal.label}</span>
               </button>
-            {/each}
-          </div>
-        {/if}
-      </div>
-    {/if}
+          {/each}
+        </div>
+      {/if}
+    </div>
 
     <button class="toolbar-icon" onclick={() => onEdit(profile)} title="Edit" aria-label="Edit tunnel">
       <Pencil size={14} />

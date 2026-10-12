@@ -10,11 +10,13 @@
     CircleStop,
     Plus,
     RefreshCw,
+    Settings as SettingsIcon,
     SquareTerminal,
     Wifi,
     WifiOff,
   } from "@lucide/svelte";
   import TunnelRow from "$lib/TunnelRow.svelte";
+  import SettingsSheet from "$lib/SettingsSheet.svelte";
   import TunnelEditor from "$lib/TunnelEditor.svelte";
   import {
     getClient,
@@ -29,6 +31,47 @@
 
   let store = $state({ ...initialStore });
   let editorOpen = $state(false);
+  let settingsOpen = $state(false);
+  // One knob for the whole window: the daemon has no opinion about appearance,
+  // so this is a page preference kept in localStorage.
+  const OPACITY_KEY = "ssh-tunnel.material-opacity";
+  const defaultOpacity = 0.72;
+  let materialOpacity = $state(defaultOpacity);
+  // Only true once the desktop host reports it really installed a material.
+  let hasMaterial = $state(false);
+
+  function readOpacity(): number {
+    try {
+      const stored = Number(window.localStorage.getItem(OPACITY_KEY));
+      return Number.isFinite(stored) && stored >= 0.4 && stored <= 0.94 ? stored : defaultOpacity;
+    } catch {
+      // Private browsing can refuse storage; the default still applies.
+      return defaultOpacity;
+    }
+  }
+
+  function applyOpacity(value: number): void {
+    materialOpacity = value;
+    document.documentElement.style.setProperty("--material-opacity", String(value));
+    try {
+      window.localStorage.setItem(OPACITY_KEY, String(value));
+    } catch {
+      // Not being able to remember it is not worth interrupting anyone over.
+    }
+  }
+
+  onMount(() => {
+    applyOpacity(readOpacity());
+    const host = (window as unknown as { __nativeHost?: { apply: (b: string) => void } }).__nativeHost;
+    if (host !== undefined) {
+      hasMaterial = document.documentElement.dataset.backdrop === "glass"
+        || document.documentElement.dataset.backdrop === "vibrancy";
+      window.addEventListener("nativehost", () => {
+        const value = document.documentElement.dataset.backdrop;
+        hasMaterial = value === "glass" || value === "vibrancy";
+      });
+    }
+  });
   let editing: TunnelProfile | null = $state(null);
   let saving = $state(false);
   let editorError: string | null = $state(null);
@@ -168,8 +211,12 @@
     // Test hook: `?editor=open` auto-opens the creation dialog for
     // screenshots and e2e without shipping any test-only UI.
     try {
-      if (new URLSearchParams(window.location.search).get("editor") === "open") {
+      const hook = new URLSearchParams(window.location.search);
+      if (hook.get("editor") === "open") {
         editorOpen = true;
+      }
+      if (hook.get("settings") === "open") {
+        settingsOpen = true;
       }
     } catch {
       // Non-browser (prerender): ignore.
@@ -184,16 +231,18 @@
 <div class="tunnel-shell">
   <!--
     Title bar. The native bar is hidden (Overlay + hiddenTitle), so this strip
-    is the window's own title bar: `data-tauri-drag-region` on the empty areas
-    makes the window draggable there, which is why the controls opt back out
-    with their own handlers rather than inheriting a drag.
+    is the window's own title bar. `data-tauri-drag-region="deep"` makes every
+    pixel of the strip draggable, including the text inside it — a bare
+    attribute only matches clicks that land on that exact element, so the
+    title's own glyphs would swallow the drag. The controls sit outside it and
+    stay clickable.
   -->
   <header class="tunnel-toolbar">
-    <div class="toolbar-title" data-tauri-drag-region>
-      <strong data-tauri-drag-region>SSH Tunnel</strong>
-      <span data-tauri-drag-region>one click to apply, one click to stop</span>
+    <div class="toolbar-title" data-tauri-drag-region="deep">
+      <strong>SSH Tunnel</strong>
+      <span>one click to apply, one click to stop</span>
     </div>
-    <span class="toolbar-spacer" data-tauri-drag-region></span>
+    <span class="toolbar-spacer" data-tauri-drag-region="deep"></span>
     <div class="toolbar-actions glass-controls">
       <button class="toolbar-button primary" onclick={openCreate} title="New tunnel">
         <Plus size={14} /> New tunnel
@@ -203,6 +252,9 @@
       </button>
       <button class="toolbar-icon" onclick={() => void refresh()} title="Refresh" aria-label="Refresh">
         <RefreshCw size={14} />
+      </button>
+      <button class="toolbar-icon" onclick={() => (settingsOpen = true)} title="Settings" aria-label="Settings">
+        <SettingsIcon size={14} />
       </button>
     </div>
   </header>
@@ -310,6 +362,14 @@
     </span>
   </footer>
 </div>
+
+<SettingsSheet
+  open={settingsOpen}
+  {hasMaterial}
+  opacity={materialOpacity}
+  onOpacity={applyOpacity}
+  onClose={() => (settingsOpen = false)}
+/>
 
 <TunnelEditor
   open={editorOpen}

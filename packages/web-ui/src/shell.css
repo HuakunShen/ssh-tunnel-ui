@@ -366,10 +366,32 @@
   .tunnel-row .row-actions {
     display: flex;
     gap: 2px;
+    align-items: center;
   }
+  /* Fixed slots. Every row shows the same controls in the same order, so their
+     columns line up across the list; a control that cannot act stays disabled in
+     place rather than collapsing and shifting the rest of the row leftwards. */
   .tunnel-row .row-actions .toolbar-icon {
     width: 26px;
     height: 26px;
+    flex: none;
+  }
+  .tunnel-row .row-actions .toolbar-button {
+    flex: none;
+    /* "Start" and "Stop" differ by one glyph; reserving the wider of the two
+       keeps the icon column beside it pinned. */
+    min-width: 68px;
+    justify-content: center;
+  }
+  .tunnel-row .row-actions .relative {
+    flex: none;
+    width: 26px;
+    height: 26px;
+  }
+  /* A control with nothing to act on still occupies its column, but must read
+     as unavailable rather than as a quiet bug. */
+  .tunnel-row .row-actions .toolbar-icon:disabled {
+    opacity: 0.32;
   }
 
   /* Status bar: 36px, 10px counters, tabular numerals — the reference bar. */
@@ -414,6 +436,18 @@
   }
 
   /* Dialogs: same popover surface as menus, same radius as controls. */
+  /*
+    Scrim behind a sheet or dialog. On a translucent window a plain translucent
+    black let the app's own rows show straight through, which made the dialog
+    look like a hole rather than a panel floating above it. Denser, and blurred,
+    so the surface behind reads as depth instead of content.
+  */
+  .sheet-scrim {
+    background: rgb(0 0 0 / 62%);
+    backdrop-filter: blur(12px) saturate(0.9);
+    -webkit-backdrop-filter: blur(12px) saturate(0.9);
+  }
+
   .tunnel-dialog {
     width: 100%;
     max-width: 660px;
@@ -423,9 +457,13 @@
     border-radius: var(--radius);
     background: var(--popover);
     color: var(--popover-foreground);
+    /* A deeper shadow and a hairline rim lift the panel off the scrim; without
+       them it reads as another translucent layer rather than something raised. */
     box-shadow:
-      0 0 0 0.5px rgb(0 0 0 / 8%),
-      0 12px 40px rgb(0 0 0 / 22%);
+      0 0 0 0.5px rgb(0 0 0 / 10%),
+      0 0 0 1px rgb(255 255 255 / 6%),
+      0 18px 48px rgb(0 0 0 / 34%),
+      0 4px 12px rgb(0 0 0 / 24%);
   }
   .dialog-title {
     font-size: 14px;

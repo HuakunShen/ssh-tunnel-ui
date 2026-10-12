@@ -2,9 +2,9 @@
 //!
 //! CSS blur cannot make a desktop window translucent on its own: the operating
 //! system has to install a real material behind the webview first. This module
-//! does that, and — only after it genuinely succeeded — tells the document so
+//! does that, and — only after it genuinely succeeded — tells the document, so
 //! the page can switch its tokens to their translucent variants. A browser tab
-//! never sets the attribute, so it keeps the opaque palette.
+//! never runs this, so it keeps the opaque palette.
 
 /// Injected at document start so the very first paint already knows whether the
 /// host installed a material.
@@ -22,30 +22,19 @@ pub fn create_main_window(app: &mut tauri::App) -> tauri::Result<()> {
         .expect("main window configuration");
     // `titleBarStyle: Overlay` + `hiddenTitle` means macOS draws only the
     // traffic lights over the page; the toolbar's `data-tauri-drag-region`
-    // supplies dragging. Windows keeps its own caption, so it is left alone.
+    // supplies dragging. The window is built here rather than by Tauri so the
+    // material and the drag-region script are in place before the first paint.
     let window = WebviewWindowBuilder::from_config(app, config)?
         .initialization_script(BOOTSTRAP)
         .build()?;
-    // Tauri's manager already holds the window; keeping this handle alive until
-    // after install means the material is in place before anything can paint.
-    eprintln!(
-        "native-material: built window {:?}",
-        window.label()
-    );
-    if std::env::var("SSH_TUNNEL_NO_MATERIAL").is_err() {
-        install(&window);
-    }
+    #[cfg(target_os = "macos")]
+    macos::install(&window);
+    #[cfg(target_os = "windows")]
+    windows::install(&window);
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    publish(&window, "none");
     let _ = &window;
     Ok(())
-}
-
-fn install(window: &tauri::WebviewWindow) {
-    #[cfg(target_os = "macos")]
-    macos::install(window);
-    #[cfg(target_os = "windows")]
-    windows::install(window);
-    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
-    publish(window, "none");
 }
 
 /// Report the installed material to the document, or `none` when there is none.
@@ -54,27 +43,11 @@ fn publish(window: &tauri::WebviewWindow, backdrop: &str) {
     let _ = window.eval(&script);
 }
 
-#[cfg(target_os = "windows")]
-mod windows {
-    use window_vibrancy::{apply_acrylic, apply_mica};
-
-    pub fn install(window: &tauri::WebviewWindow) {
-        let Ok(hwnd) = window.hwnd() else {
-            super::publish(window, "none");
-            return;
-        };
-        // Mica backdrops a whole window; acrylic tints it. Prefer mica and fall
-        // back, so a build without it still gets *some* material.
-        let installed = apply_mica(hwnd, None).is_ok() || apply_acrylic(hwnd, None).is_ok();
-        super::publish(window, if installed { "vibrancy" } else { "none" });
-    }
-}
-
 #[cfg(target_os = "macos")]
 mod macos {
     use objc2::msg_send;
-    // `ClassType` for `::class()`, `NSObjectProtocol` for `isKindOfClass`.
     use objc2::runtime::{AnyClass, AnyObject, NSObjectProtocol};
+    use objc2::sel;
     use objc2::ClassType;
     use objc2_app_kit::{NSColor, NSView, NSVisualEffectView, NSWindow};
     use window_vibrancy::{
@@ -88,39 +61,68 @@ mod macos {
         AnyClass::get(c"NSGlassEffectView")
     }
 
+    /// Install the material behind the webview.
+    ///
+    /// WebKit paints an opaque background by default, which would hide the
+    /// material completely, so the window and its webview are both made
+    /// transparent. Every private selector is guarded: if WebKit drops one, the
+    /// window stays opaque and readable rather than turning into a blank pane.
     pub fn install(window: &tauri::WebviewWindow) {
         let host = window.clone();
-        let done = window.clone();
-        let _ = window.with_webview(move |platform| {
-            // with_webview runs on the main thread and keeps Tauri's platform
-            // handles alive for the callback, so no raw pointer escapes it.
-            unsafe {
-                let view = &*platform.inner().cast::<NSView>();
-                let installed = apply_liquid_glass(
-                    &host,
-                    LiquidGlassOptions::new(NSGlassEffectViewStyle::Regular)
-                        .radius(0.0)
-                        .content_view(view),
-                )
-                .or_else(|_| {
-                    apply_vibrancy(
-                        &host,
-                        NSVisualEffectMaterial::UnderWindowBackground,
-                        None,
-                        None,
-                    )
-                })
-                .is_ok();
-                if installed {
-                    // The webview must not paint its own opaque background, or
-                    // the material behind it stays invisible.
-                    let webview = &*platform.inner().cast::<AnyObject>();
-                    let _: () = msg_send![webview, _setDrawsBackground: false];
-                    let _: () =
-                        msg_send![webview, setUnderPageBackgroundColor: &*NSColor::clearColor()];
-                }
+        // A second handle, because `with_webview` may run its closure later than
+        // this call returns.
+        let owner = window.clone();
+        let _ = window.with_webview(move |platform| unsafe {
+            let webview = &*platform.inner().cast::<AnyObject>();
+            let ns_window: Option<objc2::rc::Retained<NSWindow>> = msg_send![webview, window];
+            let Some(ns_window) = ns_window else {
+                return;
+            };
+            let transparent: bool =
+                msg_send![webview, respondsToSelector: sel!(_setDrawsBackground:)];
+            if !transparent {
+                eprintln!("native-material: webview cannot go transparent; staying opaque");
+                return;
             }
-            super::publish(&done, backdrop(&platform));
+            let view = &*platform.inner().cast::<NSView>();
+            let installed = apply_liquid_glass(
+                &host,
+                LiquidGlassOptions::new(NSGlassEffectViewStyle::Regular)
+                    .radius(0.0)
+                    .content_view(view),
+            )
+            .or_else(|_| {
+                apply_vibrancy(
+                    &host,
+                    NSVisualEffectMaterial::UnderWindowBackground,
+                    None,
+                    None,
+                )
+            });
+            if installed.is_err() {
+                eprintln!("native-material: no material available; staying opaque");
+                return;
+            }
+            let _: () = msg_send![webview, _setDrawsBackground: false];
+            let supports_under_page: bool =
+                msg_send![webview, respondsToSelector: sel!(setUnderPageBackgroundColor:)];
+            if supports_under_page {
+                let _: () = msg_send![webview, setUnderPageBackgroundColor: &*NSColor::clearColor()];
+            }
+            ns_window.setOpaque(false);
+            ns_window.setBackgroundColor(Some(&NSColor::clearColor()));
+            // The page draws its own title bar, so the native one must not
+            // paint a background either.
+            ns_window.setTitlebarAppearsTransparent(true);
+
+            let backdrop = installed_backdrop(&ns_window);
+            // `eval` has to reach a webview that is already running; calling it
+            // here, during setup, deadlocks. Hand the answer to the next tick.
+            let pending = owner.clone();
+            tauri::async_runtime::spawn_blocking(move || {
+                std::thread::sleep(std::time::Duration::from_millis(400));
+                super::publish(&pending, backdrop);
+            });
         });
     }
 
@@ -130,26 +132,35 @@ mod macos {
     /// caches that view for resize and input handling, so the material view is
     /// never reparented. Ask the view hierarchy what is really there instead of
     /// assuming the install succeeded.
-    fn backdrop(platform: &tauri::webview::PlatformWebview) -> &'static str {
-        unsafe {
-            let webview = &*platform.inner().cast::<AnyObject>();
-            let ns_window: Option<objc2::rc::Retained<NSWindow>> = msg_send![webview, window];
-            let Some(ns_window) = ns_window else {
-                return "none";
-            };
-            let Some(content) = ns_window.contentView() else {
-                return "none";
-            };
-            let glass = glass_class();
-            for view in content.subviews().iter() {
-                if glass.is_some_and(|class| view.isKindOfClass(class)) {
-                    return "glass";
-                }
-                if view.isKindOfClass(NSVisualEffectView::class()) {
-                    return "vibrancy";
-                }
+    unsafe fn installed_backdrop(ns_window: &NSWindow) -> &'static str {
+        let Some(content) = ns_window.contentView() else {
+            return "none";
+        };
+        let glass = glass_class();
+        for view in content.subviews().iter() {
+            if glass.is_some_and(|class| view.isKindOfClass(class)) {
+                return "glass";
             }
-            "none"
+            if view.isKindOfClass(NSVisualEffectView::class()) {
+                return "vibrancy";
+            }
         }
+        "none"
+    }
+}
+
+#[cfg(target_os = "windows")]
+mod windows {
+    use window_vibrancy::{apply_acrylic, apply_mica};
+
+    /// Mica backdrops a whole window; acrylic tints it. Prefer mica and fall
+    /// back, so a build without it still gets *some* material.
+    pub fn install(window: &tauri::WebviewWindow) {
+        let Ok(hwnd) = window.hwnd() else {
+            super::publish(window, "none");
+            return;
+        };
+        let installed = apply_mica(hwnd, None).is_ok() || apply_acrylic(hwnd, None).is_ok();
+        super::publish(window, if installed { "vibrancy" } else { "none" });
     }
 }
