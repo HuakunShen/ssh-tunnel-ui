@@ -58,6 +58,59 @@ const COLOR: Record<string, string> = {
   black: "#020617",
 };
 
+export interface SpanCell {
+  readonly text: string;
+  readonly bg: { r: number; g: number; b: number; a: number };
+  readonly fg: { r: number; g: number; b: number; a: number };
+  readonly width: number;
+}
+
+function rgbaToHex(c: { r: number; g: number; b: number }): string {
+  const q = (v: number): string => Math.round(v * 255).toString(16).padStart(2, "0");
+  return `#${q(c.r)}${q(c.g)}${q(c.b)}`;
+}
+
+function isTransparent(bg: { a: number }): boolean {
+  return bg.a < 0.05;
+}
+
+/**
+ * Render spans to SVG using the REAL per-span colors from `captureSpans()`.
+ * Background rects follow the actual bg runs (including the full-row box
+ * highlight), text follows the actual fg — the file reflects the renderer,
+ * not an approximation.
+ */
+export function spansToSvg(
+  lines: { spans: SpanCell[] }[][] | { spans: SpanCell[] }[],
+  cols: number,
+): string {
+  const rows = lines as { spans: SpanCell[] }[];
+  const cellW = 8.4;
+  const cellH = 17;
+  let out = "";
+  rows.forEach((line, y) => {
+    let x = 0;
+    for (const span of line.spans) {
+      const w = span.width;
+      if (!isTransparent(span.bg)) {
+        out += `  <rect x="${(x * cellW).toFixed(1)}" y="${(y * cellH).toFixed(1)}" width="${(w * cellW).toFixed(1)}" height="${cellH}" fill="${rgbaToHex(span.bg)}"/>\n`;
+      }
+      const chars = [...span.text];
+      let cx = x;
+      for (const ch of chars) {
+        if (ch !== " ") {
+          const weight = ch === "▸" || ch === "●" || ch === "◐" || ch === "✖" ? "bold" : "normal";
+          const fill = isTransparent(span.bg) ? rgbaToHex(span.fg) : "#020617";
+          out += `  <text x="${(cx * cellW).toFixed(1)}" y="${((y + 1) * cellH - 4).toFixed(1)}" fill="${fill}" font-weight="${weight}">${escapeXml(ch)}</text>\n`;
+        }
+        cx += 1;
+      }
+      x += w;
+    }
+  });
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${(cols * cellW).toFixed(0)}" height="${(rows.length * cellH).toFixed(0)}" font-family="JetBrains Mono, Menlo, monospace" font-size="13">\n<rect width="100%" height="100%" fill="#020617"/>\n${out}</svg>\n`;
+}
+
 export function frameToSvg(frame: string, selectedBg = "#22d3ee"): string {
   const rows = frame.split("\n");
   const height = rows.length;
@@ -99,11 +152,11 @@ const setup = await testRender(
   { width: 100, height: 32 },
 );
 await setup.flush();
-const frame = setup.captureCharFrame();
+const captured = setup.captureSpans();
 await setup.dispose();
 
 const outdir = join(packageDir, "..", "..", "screenshots");
 mkdirSync(outdir, { recursive: true });
 const outfile = join(outdir, "tui-list.svg");
-writeFileSync(outfile, frameToSvg(frame));
+writeFileSync(outfile, spansToSvg(captured.lines, captured.cols));
 console.log(`tui shot -> ${outfile}`);

@@ -27,6 +27,9 @@ path = "src/main.rs"
 tauri = { version = "2", features = [] }
 tauri-plugin-shell = "2"
 tauri-plugin-dialog = "2"
+# Embedded WebDriver server for `pnpm test:e2e` (WebdriverIO, embedded
+# provider). Release-only surface: debug builds skip it via cfg below.
+tauri-plugin-wdio-webdriver = "1.5.0"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 ureq = { version = "2", default-features = false, features = ["tls"] }

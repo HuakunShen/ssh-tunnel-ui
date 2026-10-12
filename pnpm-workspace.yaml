@@ -17,7 +17,14 @@ catalog:
   "@sveltejs/kit": 2.70.3
   "@sveltejs/vite-plugin-svelte": 7.3.0
   "@tailwindcss/vite": 4.3.3
+  "@tauri-apps/cli": 2.12.2
+  "@types/mocha": 10.0.10
   "@types/node": 26.5.1
+  "@wdio/cli": 9.32.0
+  "@wdio/local-runner": 9.32.0
+  "@wdio/mocha-framework": 9.32.0
+  "@wdio/spec-reporter": 9.32.0
+  "@wdio/tauri-service": 1.5.0
   "@types/react": 19.3.0
   "@types/vscode": 1.90.0
   bits-ui: 2.19.5
@@ -41,6 +48,10 @@ catalog:
 # in the workspace is allowed to run install scripts.
 allowBuilds:
   esbuild: true
+  # webdriverio pulls edge/gecko driver installers; macOS uses the embedded
+  # driver instead, but pnpm still wants an explicit verdict for their scripts.
+  edgedriver: true
+  geckodriver: true
 
 minimumReleaseAgeExclude:
   - "@opentui/core-darwin-arm64@0.6.0"
@@ -54,3 +65,15 @@ minimumReleaseAgeExclude:
   - "@opentui/core@0.6.0"
   - "@opentui/react@0.6.0"
   - "@lucide/svelte@1.55.0"
+  - "@tauri-apps/cli-darwin-arm64@2.12.2"
+  - "@tauri-apps/cli-darwin-x64@2.12.2"
+  - "@tauri-apps/cli-linux-arm-gnueabihf@2.12.2"
+  - "@tauri-apps/cli-linux-arm64-gnu@2.12.2"
+  - "@tauri-apps/cli-linux-arm64-musl@2.12.2"
+  - "@tauri-apps/cli-linux-riscv64-gnu@2.12.2"
+  - "@tauri-apps/cli-linux-x64-gnu@2.12.2"
+  - "@tauri-apps/cli-linux-x64-musl@2.12.2"
+  - "@tauri-apps/cli-win32-arm64-msvc@2.12.2"
+  - "@tauri-apps/cli-win32-ia32-msvc@2.12.2"
+  - "@tauri-apps/cli-win32-x64-msvc@2.12.2"
+  - "@tauri-apps/cli@2.12.2"

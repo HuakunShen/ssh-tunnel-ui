@@ -22,6 +22,13 @@ function baseUrl(): string {
   try {
     const override = new URLSearchParams(window.location.search).get("daemon");
     if (override !== null && override !== "") return override.replace(/\/$/, "");
+    // Inside the Tauri shell the page runs on `tauri://localhost`, where a
+    // relative `/api/*` would hit the asset protocol instead of the daemon.
+    // Same for the VS Code webview (`vscode-webview://`). Default to the
+    // loopback daemon the host spawns (or attaches to).
+    if (window.location.protocol === "tauri:" || window.location.protocol === "vscode-webview:") {
+      return "http://127.0.0.1:7432";
+    }
   } catch {
     // Non-browser (prerender): fall through to relative.
   }

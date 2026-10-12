@@ -3,20 +3,29 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Tauri shell stub: spawns the daemon (or attaches to one) and opens the Web UI in a WebView. The UI and the API stay shared; this package only composes them.",
+  "description": "Tauri shell: spawns the daemon (or attaches to one) and opens the Web UI in a WebView. The UI and the API stay shared; this package only composes them.",
   "exports": {
     ".": "./src/index.ts"
   },
   "scripts": {
     "check": "tsc --noEmit -p tsconfig.json",
     "build": "bun ./scripts/build.ts",
-    "tauri:init": "echo 'tauri init goes here: pnpm dlx @tauri-apps/cli init pointing at ../web/dist with devUrl http://127.0.0.1:7432'"
+    "tauri": "tauri",
+    "dev": "tauri dev",
+    "build:app": "tauri build",
+    "test:e2e": "SSH_TUNNEL_WEBDRIVER=1 wdio run e2e/wdio.conf.ts"
   },
   "dependencies": {
     "@ssh-tunnel/client": "workspace:*",
     "@ssh-tunnel/contract": "workspace:*"
   },
   "devDependencies": {
-    "@ssh-tunnel/build-helper": "workspace:*"
+    "@ssh-tunnel/build-helper": "workspace:*",
+    "@tauri-apps/cli": "catalog:",
+    "@wdio/cli": "catalog:",
+    "@wdio/local-runner": "catalog:",
+    "@wdio/mocha-framework": "catalog:",
+    "@wdio/spec-reporter": "catalog:",
+    "@wdio/tauri-service": "catalog:"
   }
 }

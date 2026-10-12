@@ -138,19 +138,32 @@ fn spawn_sidecar(app: &tauri::AppHandle) {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    // The embedded WebDriver server is test-only surface: production builds
+    // never expose it. E2E sets `SSH_TUNNEL_WEBDRIVER=1` (see e2e/wdio.conf.ts).
+    let builder = tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
-        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_dialog::init());
+    let builder = if std::env::var("SSH_TUNNEL_WEBDRIVER").is_ok() {
+        builder.plugin(tauri_plugin_wdio_webdriver::init())
+    } else {
+        builder
+    };
+    builder
         .setup(|app| {
             spawn_sidecar(app.handle());
-            if !wait_for_daemon(Duration::from_secs(15)) {
-                let handle = app.handle().clone();
-                tauri::async_runtime::spawn(async move {
-                    if let Some(window) = handle.get_webview_window("main") {
+            let ready = wait_for_daemon(Duration::from_secs(15));
+            // The window starts `visible: false` to avoid flashing a blank
+            // frame; reveal it once the daemon answers (or with a failure
+            // title so a broken sidecar is visible, not a missing window).
+            let handle = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                if let Some(window) = handle.get_webview_window("main") {
+                    if !ready {
                         let _ = window.set_title("SSH Tunnel — daemon failed to start");
                     }
-                });
-            }
+                    let _ = window.show();
+                }
+            });
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![daemon_url_command])
@@ -162,4 +175,46 @@ pub fn run() {
 #[tauri::command]
 fn daemon_url_command() -> String {
     daemon_url()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+
+    #[test]
+    fn daemon_url_points_at_loopback_default_port() {
+        assert_eq!(daemon_url(), "http://127.0.0.1:7432");
+    }
+
+    #[test]
+    fn find_file_locates_nested_server_bundle() {
+        let dir = std::env::temp_dir().join(format!("ssh-tunnel-find-{}", std::process::id()));
+        let nested = dir.join("a").join("b");
+        fs::create_dir_all(&nested).unwrap();
+        fs::write(nested.join("server.mjs"), "console.log(1)").unwrap();
+        fs::write(dir.join("other.txt"), "x").unwrap();
+        let found = find_file(&dir, &["server.mjs"]);
+        assert_eq!(found, Some(nested.join("server.mjs")));
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn find_file_returns_none_when_missing() {
+        let dir = std::env::temp_dir().join(format!("ssh-tunnel-missing-{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        assert_eq!(find_file(&dir, &["server.mjs"]), None);
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn find_file_respects_depth_limit() {
+        let dir = std::env::temp_dir().join(format!("ssh-tunnel-depth-{}", std::process::id()));
+        let deep = dir.join("1").join("2").join("3").join("4").join("5");
+        fs::create_dir_all(&deep).unwrap();
+        fs::write(deep.join("server.mjs"), "console.log(1)").unwrap();
+        // Depth budget is 4 levels: 5-deep file stays invisible.
+        assert_eq!(find_file(&dir, &["server.mjs"]), None);
+        fs::remove_dir_all(&dir).unwrap();
+    }
 }
