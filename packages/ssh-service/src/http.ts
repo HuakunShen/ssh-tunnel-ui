@@ -12,6 +12,8 @@ import {
   hostListResponseSchema,
   launchRequestSchema,
   launchResponseSchema,
+  openUrlRequestSchema,
+  openUrlResponseSchema,
   previewResponseSchema,
   profileInputSchema,
   profileListResponseSchema,
@@ -154,6 +156,23 @@ export function createServiceApp(context: ServiceContext): Hono {
       return toResponse(new TunnelError("InternalError", "terminal list shape drifted"));
     }
     return c.json(checked.data);
+  });
+
+  app.post("/api/open-url", async (c) => {
+    try {
+      const parsed = openUrlRequestSchema.safeParse(await parseJson(c.req.raw));
+      if (!parsed.success) {
+        throw new TunnelError("InvalidRequest", "open-url needs a url");
+      }
+      const opened = context.manager.openUrl(parsed.data.url);
+      const checked = openUrlResponseSchema.safeParse(opened);
+      if (!checked.success) {
+        return toResponse(new TunnelError("InternalError", "open-url shape drifted"));
+      }
+      return c.json(checked.data);
+    } catch (error) {
+      return toResponse(error);
+    }
   });
 
   app.post("/api/profiles/:id/launch", async (c) => {

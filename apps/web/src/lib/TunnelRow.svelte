@@ -11,12 +11,14 @@
     Check,
     ExternalLink,
     FlaskConical,
+    Link,
     Pencil,
     Play,
     Terminal as TerminalIcon,
     Trash,
   } from "@lucide/svelte";
-  import type { TerminalTarget, TunnelProfile, TunnelState } from "$lib/store";
+  import { endpointSummary, localForwardEndpoint, type LocalEndpoint } from "@ssh-tunnel/core";
+  import { openUrl, type TerminalTarget, type TunnelProfile, type TunnelState } from "$lib/store";
 
   interface Props {
     profile: TunnelProfile;
@@ -48,6 +50,28 @@
 
   let menuOpen = $state(false);
   let copied = $state(false);
+  let endpointCopied = $state(false);
+  let openError = $state<string | undefined>(undefined);
+
+  /**
+   * Each forward paired with the endpoint a browser can open, when it has one.
+   * Only `ssh -L` listens on this machine, so SOCKS5 and `-R` pair with nothing
+   * and stay plain text — offering a link there would be a dead address.
+   */
+  const rows = $derived(
+    profile.forwards.map((forward) => ({
+      forward,
+      endpoint: localForwardEndpoint(forward),
+      text: forwardText(forward),
+    })),
+  );
+
+  // One pasteable line of every browsable endpoint in this profile.
+  const pasteable = $derived(
+    endpointSummary(
+      rows.map((row) => row.endpoint).filter((e): e is LocalEndpoint => e !== undefined),
+    ),
+  );
 
   const status = $derived(tunnelState?.status ?? "stopped");
   const live = $derived(status === "running" || status === "degraded" || status === "starting");
@@ -83,7 +107,27 @@
     }
     const bind = (f.bindAddress ? `${f.bindAddress}:` : "") + String(f.bindPort);
     const arrow = f.kind === "local" ? "→" : "←";
-    return `localhost:${bind} ${arrow} ${f.targetHost}:${f.targetPort}`;
+    return `${localForwardEndpoint(f)?.endpoint ?? "localhost:" + bind} ${arrow} ${f.targetHost}:${f.targetPort}`;
+  }
+
+  /**
+   * Hand the address to the OS. Opening it in this window instead would take
+   * the console away from the user — an anchor navigates the webview frame.
+   */
+  async function browse(endpoint: LocalEndpoint): Promise<void> {
+    openError = undefined;
+    try {
+      await openUrl(endpoint.url);
+    } catch (error) {
+      openError = error instanceof Error ? error.message : "could not open the browser";
+    }
+  }
+
+  async function copyEndpoint(): Promise<void> {
+    if (pasteable === "") return;
+    await navigator.clipboard.writeText(pasteable);
+    endpointCopied = true;
+    setTimeout(() => (endpointCopied = false), 1600);
   }
 
   function pick(terminalId: string): void {
@@ -113,11 +157,25 @@
       <span class="truncate">
         {profile.sshTarget}{#if profile.jumpHops?.length}&nbsp;via&nbsp;{profile.jumpHops.join(", ")}{/if}
       </span>
-      {#each profile.forwards as f}
-        <span class="truncate">{forwardText(f)}</span>
+      {#each rows as row (row.text)}
+        {#if row.endpoint}
+          <button
+            class="endpoint truncate"
+            type="button"
+            onclick={() => void browse(row.endpoint as LocalEndpoint)}
+            title="Open {row.endpoint.url} in your browser. Copy {row.endpoint.endpoint} to paste into a terminal, a browser bar, or a database client."
+          >
+            <ExternalLink size={11} />
+            {row.endpoint.endpoint}
+          </button>
+        {:else}
+          <span class="truncate">{row.text}</span>
+        {/if}
       {/each}
     </div>
-    {#if tunnelState?.lastError}
+    {#if openError !== undefined}
+      <p class="mt-1 truncate text-[10px] text-destructive" title={openError}>{openError}</p>
+    {:else if tunnelState?.lastError}
       <p class="mt-1 truncate text-[10px] text-destructive" title={tunnelState.lastError}>{tunnelState.lastError}</p>
     {/if}
   </div>
@@ -136,6 +194,17 @@
     <button class="toolbar-icon" onclick={() => void copy()} title="Copy the ssh command" aria-label="Copy the ssh command">
       {#if copied}<Check size={14} />{:else}<Copy size={14} />{/if}
     </button>
+
+    {#if pasteable !== ""}
+      <button
+        class="toolbar-icon"
+        onclick={() => void copyEndpoint()}
+        title="Copy {pasteable} — paste it into a terminal, a browser bar, or a database client"
+        aria-label="Copy the local address"
+      >
+        {#if endpointCopied}<Check size={14} />{:else}<Link size={14} />{/if}
+      </button>
+    {/if}
 
     <button class="toolbar-icon" disabled={busy} onclick={() => onProbe(profile.id)} title="Probe forwarded ports" aria-label="Probe forwarded ports">
       <FlaskConical size={14} />

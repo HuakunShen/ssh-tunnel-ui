@@ -15,7 +15,8 @@
     "@lucide/svelte": "catalog:",
     "@ssh-tunnel/client": "workspace:*",
     "@ssh-tunnel/contract": "workspace:*",
-    "@ssh-tunnel/web-ui": "workspace:*"
+    "@ssh-tunnel/web-ui": "workspace:*",
+    "@ssh-tunnel/core": "workspace:*"
   },
   "devDependencies": {
     "@ssh-tunnel/build-helper": "workspace:*",

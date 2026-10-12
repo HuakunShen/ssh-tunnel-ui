@@ -9,6 +9,7 @@ import {
   hostListResponseSchema,
   isTunnelProblem,
   launchResponseSchema,
+  openUrlResponseSchema,
   previewResponseSchema,
   profileListResponseSchema,
   stateListResponseSchema,
@@ -122,6 +123,8 @@ export function createTunnelClient(options: TunnelClientOptions): {
     pid: number;
     launchedAt: string;
   }>;
+  /** Hand a URL to the OS default handler (the user's own browser). */
+  openUrl(url: string): Promise<{ url: string; openedAt: string }>;
   closeSession(id: string): Promise<void>;
 } {
   return {
@@ -179,6 +182,9 @@ export function createTunnelClient(options: TunnelClientOptions): {
     launchInTerminal: (id, terminalId) =>
       request(options, "POST", launchPath(id), (body) =>
         must(launchResponseSchema.loose().safeParse(body)), { terminalId }),
+    openUrl: (url) =>
+      request(options, "POST", "/api/open-url", (body) =>
+        must(openUrlResponseSchema.loose().safeParse(body)), { url }),
     closeSession: async (id): Promise<void> => {
       await request(options, "DELETE", `${profilePath(id)}/session`, () => undefined);
     },

@@ -21,9 +21,11 @@ import {
   stopTarget,
   validateProfileInput,
 } from "@ssh-tunnel/core";
+import { isOpenableUrl } from "@ssh-tunnel/host-node";
 import type {
   ClockPort,
   ExternalSession,
+  OpenUrlPort,
   ProbePort,
   ProcessPort,
   SpawnedProcess,
@@ -45,6 +47,8 @@ export interface ManagerOptions {
   readonly maxProfiles?: number;
   /** Optional: without it the daemon only exposes "copy the command". */
   readonly terminal?: TerminalPort;
+  /** Optional: without it, "open in browser" is refused rather than faked. */
+  readonly openUrl?: OpenUrlPort;
 }
 
 interface LiveTunnel {
@@ -94,6 +98,7 @@ export class TunnelManager {
   private readonly logDir: string;
   private readonly maxProfiles: number;
   private readonly terminal: TerminalPort | undefined;
+  private readonly openUrlPort: OpenUrlPort | undefined;
   private readonly sessions = new Map<string, ExternalSession>();
   private profiles = new Map<string, TunnelProfile>();
   private states = new Map<string, TunnelState>();
@@ -108,6 +113,7 @@ export class TunnelManager {
     this.logDir = options.logDir;
     this.maxProfiles = options.maxProfiles ?? 200;
     this.terminal = options.terminal;
+    this.openUrlPort = options.openUrl;
   }
 
   private async ensureLoaded(): Promise<void> {
@@ -573,6 +579,33 @@ export class TunnelManager {
   /** Sessions this daemon launched, newest launch per profile. */
   listSessions(): readonly ExternalSession[] {
     return [...this.sessions.values()];
+  }
+
+  // -- opening URLs ---------------------------------------------------------
+
+  /**
+   * Hand a URL to the operating system's default handler.
+   *
+   * The daemon does this rather than the page: inside a webview a plain anchor
+   * would navigate the console away instead of opening a browser. Anything
+   * that is not http(s) is refused here, so this stays a safe seam even though
+   * the caller builds the address.
+   */
+  openUrl(url: string): { readonly url: string; readonly openedAt: string } {
+    if (this.openUrlPort === undefined) {
+      throw new TunnelError(
+        "UnsupportedOperation",
+        "this daemon build cannot open external urls",
+        { details: { url } },
+      );
+    }
+    if (!isOpenableUrl(url)) {
+      throw new TunnelError("InvalidRequest", "only http and https urls can be opened", {
+        details: { url },
+      });
+    }
+    this.openUrlPort.open(url);
+    return { url, openedAt: this.clock.nowIso() };
   }
 
   /** End a launched terminal session. Returns false when none was tracked. */

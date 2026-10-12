@@ -3285,6 +3285,9 @@ dependencies = [
 name = "ssh-tunnel-desktop"
 version = "0.1.0"
 dependencies = [
+ "objc2",
+ "objc2-app-kit",
+ "objc2-foundation",
  "serde",
  "serde_json",
  "tauri",
@@ -3293,6 +3296,7 @@ dependencies = [
  "tauri-plugin-shell",
  "tauri-plugin-wdio-webdriver",
  "ureq",
+ "window-vibrancy",
 ]
 
 [[package]]

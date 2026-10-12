@@ -446,6 +446,38 @@
     color: var(--muted-foreground);
     text-align: right;
   }
+  /* A forwarded address that opens in the browser. It has to read as a link at
+     a glance — accent colour, underline on hover, an arrow glyph — while still
+     matching the 10px detail type of the rest of the row. */
+  .endpoint {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 11px;
+    color: var(--primary);
+    text-decoration: none;
+    border-bottom: 1px solid transparent;
+    transition:
+      color 120ms,
+      border-color 120ms;
+  }
+  .endpoint svg {
+    flex: none;
+    opacity: 0.7;
+  }
+  .endpoint:hover {
+    border-bottom-color: color-mix(in oklch, var(--primary) 45%, transparent);
+  }
+  .endpoint:active {
+    color: color-mix(in oklch, var(--primary) 80%, var(--foreground));
+  }
+  .endpoint:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+
   /* Direction sketches: the teaching layer that replaces raw -L/-R/-D flags. */
   .sketch {
     font-family: ui-monospace, SFMono-Regular, Menlo, monospace;

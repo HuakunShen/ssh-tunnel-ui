@@ -224,6 +224,19 @@ export const launchResponseSchema = z.strictObject({
 
 export type TerminalTarget = z.infer<typeof terminalTargetSchema>;
 
+/**
+ * Opening a forwarded port in the user's own browser. The daemon performs the
+ * OS call so a webview never navigates itself away from the console.
+ */
+export const openUrlRequestSchema = z.strictObject({
+  url: z.string().min(1).max(2048),
+});
+
+export const openUrlResponseSchema = z.strictObject({
+  url: z.string().min(1).max(2048),
+  openedAt: z.string().min(1),
+});
+
 export const healthResponseSchema = z.strictObject({
   ok: z.literal(true),
   version: z.string().min(1).max(32),

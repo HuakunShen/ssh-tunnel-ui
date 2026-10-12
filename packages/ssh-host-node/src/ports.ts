@@ -56,6 +56,18 @@ export interface TerminalPort {
   close(pid: number): void;
 }
 
+/**
+ * Opening a URL in the user's own default handler.
+ *
+ * A webview cannot do this with a plain anchor: clicking one navigates the
+ * application frame instead of handing the address to the browser. The daemon
+ * owns the OS call, so every host (browser, Tauri, VS Code) behaves the same.
+ */
+export interface OpenUrlPort {
+  /** Hand `url` to the system default handler. Throws when the OS refuses. */
+  open(url: string): void;
+}
+
 export const systemClock: ClockPort = {
   nowIso(): string {
     return new Date().toISOString();

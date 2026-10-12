@@ -4,5 +4,6 @@
  * The host layer (process spawn, sockets, files) is injected via ports.
  */
 export * from "./argv.js";
+export * from "./endpoint.js";
 export * from "./validate.js";
 export * from "./state-machine.js";

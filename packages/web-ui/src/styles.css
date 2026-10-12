@@ -259,6 +259,35 @@
     -webkit-backdrop-filter: blur(24px) saturate(1.5);
   }
 
+  /*
+    Native material, published by the desktop host only after it really
+    installed one (`data-backdrop`). Until then the page stays opaque: a
+    translucent surface over nothing reads as a washed-out grey box. The base
+    layer goes transparent so the OS material shows through, and the data
+    surfaces get a solid enough tint to stay readable over any wallpaper.
+  */
+  :root:is([data-backdrop="glass"], [data-backdrop="vibrancy"])[data-interface="macos"] {
+    --background: transparent;
+    --card: rgb(28 28 30 / 78%);
+    --sidebar: rgb(24 24 26 / 64%);
+    --chrome: rgb(20 20 22 / 68%);
+    --control: rgb(50 50 54 / 88%);
+  }
+  :root:is([data-backdrop="glass"], [data-backdrop="vibrancy"])[data-interface="macos"].dark {
+    --card: rgb(28 28 32 / 82%);
+    --sidebar: rgb(24 25 31 / 72%);
+    --chrome: rgb(16 17 22 / 62%);
+    --control: rgb(44 45 54 / 82%);
+  }
+  /* The content column is the reading surface: keep it legible over a bright
+     desktop, which the desktop material cannot promise. */
+  :root:is([data-backdrop="glass"], [data-backdrop="vibrancy"])[data-interface="macos"] .tunnel-content {
+    background: rgb(18 18 20 / 86%);
+  }
+  :root:is([data-backdrop="glass"], [data-backdrop="vibrancy"])[data-interface="macos"].dark .tunnel-content {
+    background: rgb(18 18 22 / 88%);
+  }
+
   /* Reduced transparency is a system setting, not a preference to ignore. */
   @media (prefers-reduced-transparency: reduce) {
     :root.dark[data-interface="macos"] {
@@ -271,6 +300,25 @@
     :root[data-interface="macos"] :is(.tunnel-toolbar, .tunnel-sidebar, .tunnel-inspector) {
       backdrop-filter: none;
       -webkit-backdrop-filter: none;
+    }
+    /* The native material is a system setting the user already turned off, so
+       the page must not fake it back with translucent tokens. */
+    :root:is([data-backdrop="glass"], [data-backdrop="vibrancy"])[data-interface="macos"] {
+      --background: #ffffff;
+      --card: #f6f6f7;
+      --sidebar: #eaeaec;
+      --chrome: #eeeeef;
+      --control: #ffffff;
+    }
+    :root:is([data-backdrop="glass"], [data-backdrop="vibrancy"])[data-interface="macos"].dark {
+      --background: #121216;
+      --card: #1b1c21;
+      --sidebar: #191a1e;
+      --chrome: #14151a;
+      --control: #2a2b33;
+    }
+    :root:is([data-backdrop="glass"], [data-backdrop="vibrancy"])[data-interface="macos"] .tunnel-content {
+      background: var(--background);
     }
   }
 }

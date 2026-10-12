@@ -101,3 +101,14 @@ export async function refreshTerminals(store: TunnelStore): Promise<TunnelStore>
     return { ...store, terminals: [] };
   }
 }
+
+/**
+ * Open a forwarded port in the user's own browser.
+ *
+ * The daemon performs the OS call: inside a webview a plain anchor would
+ * navigate this console away instead of launching a browser. An older daemon
+ * has no such route, so the failure is surfaced rather than silently swallowed.
+ */
+export async function openUrl(url: string): Promise<void> {
+  await getClient().openUrl(url);
+}

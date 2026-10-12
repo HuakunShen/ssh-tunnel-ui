@@ -13,13 +13,16 @@
     "windows": [
       {
         "label": "main",
+        "create": false,
         "title": "SSH Tunnel",
         "width": 1080,
         "height": 760,
         "minWidth": 800,
         "minHeight": 560,
         "resizable": true,
-        "visible": false
+        "visible": false,
+        "titleBarStyle": "Overlay",
+        "hiddenTitle": true
       }
     ],
     "withGlobalTauri": false,
@@ -29,10 +32,16 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["app"],
+    "targets": [
+      "app"
+    ],
     "category": "Utility",
     "shortDescription": "One-click SSH tunnel manager.",
-    "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png"],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png"
+    ],
     "resources": [
       "../../server/dist/server.mjs",
       "../../web/dist"

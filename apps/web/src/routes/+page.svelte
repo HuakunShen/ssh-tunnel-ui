@@ -182,13 +182,18 @@
 </script>
 
 <div class="tunnel-shell">
-  <!-- Title bar -->
+  <!--
+    Title bar. The native bar is hidden (Overlay + hiddenTitle), so this strip
+    is the window's own title bar: `data-tauri-drag-region` on the empty areas
+    makes the window draggable there, which is why the controls opt back out
+    with their own handlers rather than inheriting a drag.
+  -->
   <header class="tunnel-toolbar">
-    <div class="toolbar-title">
-      <strong>SSH Tunnel</strong>
-      <span>one click to apply, one click to stop</span>
+    <div class="toolbar-title" data-tauri-drag-region>
+      <strong data-tauri-drag-region>SSH Tunnel</strong>
+      <span data-tauri-drag-region>one click to apply, one click to stop</span>
     </div>
-    <span class="toolbar-spacer"></span>
+    <span class="toolbar-spacer" data-tauri-drag-region></span>
     <div class="toolbar-actions glass-controls">
       <button class="toolbar-button primary" onclick={openCreate} title="New tunnel">
         <Plus size={14} /> New tunnel

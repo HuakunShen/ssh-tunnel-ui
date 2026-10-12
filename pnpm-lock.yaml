@@ -401,6 +401,9 @@ importers:
       '@ssh-tunnel/contract':
         specifier: workspace:*
         version: link:../../packages/ssh-contract
+      '@ssh-tunnel/core':
+        specifier: workspace:*
+        version: link:../../packages/ssh-core
       '@ssh-tunnel/web-ui':
         specifier: workspace:*
         version: link:../../packages/web-ui

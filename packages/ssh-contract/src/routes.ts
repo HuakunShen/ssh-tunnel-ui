@@ -19,6 +19,7 @@ export const TUNNEL_ROUTES = {
   listHosts: { method: "GET", path: "/api/ssh-hosts" },
   listTerminals: { method: "GET", path: "/api/terminals" },
   launchInTerminal: { method: "POST", path: "/api/profiles/:id/launch" },
+  openUrl: { method: "POST", path: "/api/open-url" },
 } as const;
 
 export type TunnelRouteName = keyof typeof TUNNEL_ROUTES;

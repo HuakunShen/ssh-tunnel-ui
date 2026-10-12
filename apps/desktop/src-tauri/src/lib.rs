@@ -5,6 +5,8 @@
 //! opens the bundled Web UI in a single window. All tunnel rules stay in the
 //! TypeScript backend; no domain logic lives in Rust.
 
+mod native_material;
+
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
 use tauri::Manager;
@@ -150,13 +152,30 @@ pub fn run() {
     };
     builder
         .setup(|app| {
+            // Build the window by hand: the hidden title bar needs its drag
+            // region script installed before the document loads, and the
+            // native material has to go in before anything is shown.
+            // A material failure must not cost the user their window: fall
+            // back to Tauri's own creation, which still works, just opaque.
+            if let Err(error) = native_material::create_main_window(app) {
+                eprintln!("native material unavailable ({error}); using a plain window");
+                let window = tauri::WebviewWindowBuilder::from_config(
+                    app,
+                    app.config().app.windows.first().expect("main window configuration"),
+                )?;
+                let _ = window;
+            }
             spawn_sidecar(app.handle());
-            let ready = wait_for_daemon(Duration::from_secs(15));
             // The window starts `visible: false` to avoid flashing a blank
             // frame; reveal it once the daemon answers (or with a failure
             // title so a broken sidecar is visible, not a missing window).
+            //
+            // The poll cannot block setup: on macOS the main thread is the UI
+            // thread, so waiting there stops the event loop from ever running
+            // and the window never appears at all.
             let handle = app.handle().clone();
-            tauri::async_runtime::spawn(async move {
+            tauri::async_runtime::spawn_blocking(move || {
+                let ready = wait_for_daemon(Duration::from_secs(15));
                 if let Some(window) = handle.get_webview_window("main") {
                     if !ready {
                         let _ = window.set_title("SSH Tunnel — daemon failed to start");

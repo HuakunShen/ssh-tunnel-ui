@@ -34,6 +34,19 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 ureq = { version = "2", default-features = false, features = ["tls"] }
 
+[target.'cfg(target_os = "macos")'.dependencies]
+# Native window material. macOS 26+ gets Liquid Glass; older systems fall back
+# to a vibrancy effect. Without this the window is an opaque rectangle and the
+# page's translucency has nothing to show through.
+window-vibrancy = "0.8.1"
+objc2 = "0.6.4"
+objc2-app-kit = { version = "0.3.2", default-features = false, features = ["std", "NSColor", "NSView", "NSVisualEffectView", "NSWindow"] }
+objc2-foundation = { version = "0.3.2", default-features = false, features = ["std", "NSString"] }
+
+[target.'cfg(windows)'.dependencies]
+# Windows 11 acrylic for the same reason as macOS above.
+window-vibrancy = "0.8.1"
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 

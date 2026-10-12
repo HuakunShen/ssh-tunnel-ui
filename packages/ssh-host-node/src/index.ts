@@ -10,3 +10,4 @@ export * from "./probe.js";
 export * from "./store.js";
 export * from "./ssh-config.js";
 export * from "./terminal.js";
+export * from "./open-url.js";

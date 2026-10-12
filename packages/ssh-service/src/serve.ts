@@ -10,6 +10,7 @@ import {
   createNodeProbePort,
   createNodeProcessPort,
   createFileStorePort,
+  createOpenUrlPort,
   createTerminalPort,
   systemClock,
 } from "@ssh-tunnel/host-node";
@@ -61,6 +62,7 @@ export async function startDaemon(options: ServeOptions = {}): Promise<{ port: n
     clock: systemClock,
     logDir,
     terminal: createTerminalPort(),
+    openUrl: createOpenUrlPort(),
   });
   const instanceId = `svc-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
   const api = createServiceApp({ manager, serviceInstanceId: instanceId });
