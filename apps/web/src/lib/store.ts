@@ -9,12 +9,13 @@
 import { createTunnelClient, type TunnelClient } from "@ssh-tunnel/client";
 import type {
   SshHostInfo,
+  TerminalTarget,
   TunnelProfile,
   TunnelProfileInput,
   TunnelState,
 } from "@ssh-tunnel/contract";
 
-export type { TunnelProfile, TunnelProfileInput, TunnelState, SshHostInfo };
+export type { TunnelProfile, TunnelProfileInput, TunnelState, SshHostInfo, TerminalTarget };
 
 function baseUrl(): string {
   // Same-origin when served by the daemon; `?daemon=` override for dev
@@ -48,6 +49,7 @@ export interface TunnelStore {
   profiles: TunnelProfile[];
   states: TunnelState[];
   hosts: SshHostInfo[];
+  terminals: TerminalTarget[];
   connected: boolean;
   lastError: string | null;
   loading: boolean;
@@ -57,6 +59,7 @@ export const initialStore: TunnelStore = {
   profiles: [],
   states: [],
   hosts: [],
+  terminals: [],
   connected: false,
   lastError: null,
   loading: true,
@@ -83,5 +86,18 @@ export async function refreshHosts(store: TunnelStore): Promise<TunnelStore> {
     return { ...store, hosts: [...hosts] };
   } catch {
     return store;
+  }
+}
+
+/**
+ * Installed terminals for the "Open in…" menu. An older daemon has no such
+ * route, which is not an error: the UI simply falls back to copy-only.
+ */
+export async function refreshTerminals(store: TunnelStore): Promise<TunnelStore> {
+  try {
+    const terminals = await getClient().listTerminals();
+    return { ...store, terminals: [...terminals] };
+  } catch {
+    return { ...store, terminals: [] };
   }
 }

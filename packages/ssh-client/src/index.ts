@@ -8,17 +8,21 @@ import {
   healthResponseSchema,
   hostListResponseSchema,
   isTunnelProblem,
+  launchResponseSchema,
   previewResponseSchema,
   profileListResponseSchema,
   stateListResponseSchema,
+  terminalListResponseSchema,
   tunnelProfileSchema,
   tunnelStateSchema,
   TunnelError,
   type SshHostInfo,
+  type TerminalTarget,
   type TunnelProblemCode,
   type TunnelProfile,
   type TunnelProfileInput,
   type TunnelState,
+  launchPath,
   previewPath,
   probePath,
   profilePath,
@@ -107,6 +111,18 @@ export function createTunnelClient(options: TunnelClientOptions): {
   stopAll(): Promise<readonly TunnelState[]>;
   probe(id: string): Promise<TunnelState>;
   listHosts(): Promise<readonly SshHostInfo[]>;
+  listTerminals(): Promise<readonly TerminalTarget[]>;
+  launchInTerminal(
+    id: string,
+    terminalId: string,
+  ): Promise<{
+    profileId: string;
+    terminalId: string;
+    command: string;
+    pid: number;
+    launchedAt: string;
+  }>;
+  closeSession(id: string): Promise<void>;
 } {
   return {
     health: () =>
@@ -156,6 +172,16 @@ export function createTunnelClient(options: TunnelClientOptions): {
       request(options, "GET", "/api/ssh-hosts", (body) =>
         must(hostListResponseSchema.loose().safeParse(body)).hosts,
       ),
+    listTerminals: () =>
+      request(options, "GET", "/api/terminals", (body) =>
+        must(terminalListResponseSchema.loose().safeParse(body)).terminals,
+      ),
+    launchInTerminal: (id, terminalId) =>
+      request(options, "POST", launchPath(id), (body) =>
+        must(launchResponseSchema.loose().safeParse(body)), { terminalId }),
+    closeSession: async (id): Promise<void> => {
+      await request(options, "DELETE", `${profilePath(id)}/session`, () => undefined);
+    },
   };
 }
 

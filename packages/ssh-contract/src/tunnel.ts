@@ -193,6 +193,37 @@ export const previewResponseSchema = z.strictObject({
   command: z.string(),
 });
 
+/** A terminal the host can launch a tunnel command in. */
+export const terminalTargetSchema = z.strictObject({
+  id: z.string().min(1).max(32),
+  label: z.string().min(1).max(48),
+  hint: z.string().max(96),
+  platform: z.string().min(1).max(16),
+});
+
+export const terminalListResponseSchema = z.strictObject({
+  terminals: z.array(terminalTargetSchema),
+});
+
+export const launchRequestSchema = z.strictObject({
+  terminalId: z.string().min(1).max(32),
+});
+
+/**
+ * A command handed to a real terminal app. The daemon spawned that app, so
+ * `pid` is ours to end — but health still comes from probing the forwarded
+ * ports, never from this process.
+ */
+export const launchResponseSchema = z.strictObject({
+  profileId: z.string().min(1).max(64),
+  terminalId: z.string().min(1).max(32),
+  command: z.string(),
+  pid: z.number().int(),
+  launchedAt: z.string().min(1),
+});
+
+export type TerminalTarget = z.infer<typeof terminalTargetSchema>;
+
 export const healthResponseSchema = z.strictObject({
   ok: z.literal(true),
   version: z.string().min(1).max(32),

@@ -115,17 +115,17 @@
       role="dialog"
       aria-modal="true"
       aria-label={editing ? "Edit tunnel" : "New tunnel"}
-      class="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-[10px] border border-border bg-popover p-6 shadow-[0_8px_30px_rgb(0_0_0/0.18)]"
+      class="tunnel-dialog p-5"
       onclick={(e) => e.stopPropagation()}
       onkeydown={(e) => e.key === "Escape" && onClose()}
       tabindex="-1"
     >
       <div class="mb-4 flex items-center justify-between">
-        <h2 class="text-lg font-semibold tracking-tight">{editing ? `Edit — ${editing.name}` : "New tunnel"}</h2>
+        <h2 class="dialog-title">{editing ? `Edit — ${editing.name}` : "New tunnel"}</h2>
         <Button variant="ghost" size="icon-sm" onclick={onClose} aria-label="Close"><X size={18} /></Button>
       </div>
 
-      <div class="grid grid-cols-[120px_minmax(0,1fr)] items-center gap-x-3 gap-y-3 text-sm">
+      <div class="dialog-field">
         <label for="f-name" class="text-muted-foreground">Name</label>
         <Input id="f-name" bind:value={name} placeholder="ufo · jupyter" maxlength={120} />
 
@@ -137,17 +137,17 @@
               <option value={m}>{m} — {modeHelp[m]}</option>
             {/each}
           </select>
-          <p class="mt-1 font-mono text-[11px] text-muted-foreground">
+          <p class="sketch mt-1.5">
             {#if mode === "local"}
-              ◉ localhost:port <span class="text-primary">⟵</span> remote-host:port <span class="opacity-70">· e.g. read remote DB as localhost:5432</span>
+              ◉ localhost:port <span class="arrow">⟵</span> remote-host:port <span class="hint">· e.g. read remote DB as localhost:5432</span>
             {:else if mode === "remote"}
-              remote-host:port <span class="text-primary">⟶</span> ◉ localhost:port <span class="opacity-70">· e.g. demo your laptop app from the server</span>
+              remote-host:port <span class="arrow">⟶</span> ◉ localhost:port <span class="hint">· e.g. demo your laptop app from the server</span>
             {:else if mode === "dynamic"}
-              ◉ localhost:port <span class="text-primary">⟷</span> anywhere <span class="opacity-70">· e.g. browse as if on the remote network</span>
+              ◉ localhost:port <span class="arrow">⟷</span> anywhere <span class="hint">· e.g. browse as if on the remote network</span>
             {:else if mode === "jump"}
-              you <span class="text-primary">⟶</span> bastion <span class="text-primary">⟶</span> target <span class="opacity-70">· fill Jump hops below</span>
+              you <span class="arrow">⟶</span> bastion <span class="arrow">⟶</span> target <span class="hint">· fill Jump hops below</span>
             {:else}
-              one SSH connection, several forwards <span class="opacity-70">· add rows below</span>
+              one SSH connection, several forwards <span class="hint">· add rows below</span>
             {/if}
           </p>
         </div>
@@ -203,13 +203,13 @@
                 {/each}
               </div>
               <!-- Direction sketch: which side listens, which side serves -->
-              <p class="mb-2 font-mono text-[11px] text-muted-foreground">
+              <p class="sketch mb-2">
                 {#if f.kind === "local"}
-                  ◉ this machine:{f.port || "port"} <span class="text-primary">⟵</span> {f.host || "remote host"}:{f.targetPort || "port"} via SSH
+                  ◉ this machine:{f.port || "port"} <span class="arrow">⟵</span> {f.host || "remote host"}:{f.targetPort || "port"} via SSH
                 {:else if f.kind === "remote"}
-                  SSH <span class="text-primary">⟶</span> server:{f.port || "port"} ◉ serves {f.host || "local host"}:{f.targetPort || "port"}
+                  SSH <span class="arrow">⟶</span> server:{f.port || "port"} ◉ serves {f.host || "local host"}:{f.targetPort || "port"}
                 {:else}
-                  ◉ SOCKS5 on this machine:{f.port || "port"} <span class="text-primary">⟷</span> anywhere via SSH
+                  ◉ SOCKS5 on this machine:{f.port || "port"} <span class="arrow">⟷</span> anywhere via SSH
                 {/if}
               </p>
               <div class="grid grid-cols-[minmax(0,1fr)_72px_minmax(0,1fr)_72px_28px] gap-1.5">
@@ -231,7 +231,7 @@
       </div>
 
       {#if formError ?? error}
-        <p class="mt-3 text-sm text-destructive">{formError ?? error}</p>
+        <p class="mt-3 text-[12px] text-destructive">{formError ?? error}</p>
       {/if}
 
       <div class="mt-5 flex justify-end gap-2">

@@ -10,10 +10,13 @@ import {
   TunnelError,
   healthResponseSchema,
   hostListResponseSchema,
+  launchRequestSchema,
+  launchResponseSchema,
   previewResponseSchema,
   profileInputSchema,
   profileListResponseSchema,
   stateListResponseSchema,
+  terminalListResponseSchema,
   tunnelStateSchema,
   type TunnelProblemCode,
   type TunnelProfile,
@@ -141,6 +144,45 @@ export function createServiceApp(context: ServiceContext): Hono {
     } catch (error) {
       return toResponse(error);
     }
+  });
+
+  app.get("/api/terminals", (c) => {
+    const checked = terminalListResponseSchema.safeParse({
+      terminals: [...context.manager.listTerminals()],
+    });
+    if (!checked.success) {
+      return toResponse(new TunnelError("InternalError", "terminal list shape drifted"));
+    }
+    return c.json(checked.data);
+  });
+
+  app.post("/api/profiles/:id/launch", async (c) => {
+    try {
+      const parsed = launchRequestSchema.safeParse(await parseJson(c.req.raw));
+      if (!parsed.success) {
+        throw new TunnelError("InvalidRequest", "launch needs a terminalId");
+      }
+      const session = context.manager.launchInTerminal(c.req.param("id"), parsed.data.terminalId);
+      const checked = launchResponseSchema.safeParse(session);
+      if (!checked.success) {
+        return toResponse(new TunnelError("InternalError", "launch shape drifted"));
+      }
+      return c.json(checked.data);
+    } catch (error) {
+      return toResponse(error);
+    }
+  });
+
+  app.delete("/api/profiles/:id/session", (c) => {
+    const closed = context.manager.closeSession(c.req.param("id"));
+    if (!closed) {
+      return toResponse(
+        new TunnelError("NotFound", "no terminal session for this profile", {
+          details: { profileId: c.req.param("id") },
+        }),
+      );
+    }
+    return c.json({ ok: true as const });
   });
 
   app.get("/api/states", async (c) => {

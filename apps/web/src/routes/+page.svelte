@@ -1,12 +1,12 @@
 <!--
-  Tunnel console main page: header stats, tunnel card grid, editor dialog,
-  inspect drawer. Polls the daemon every 3s; all mutations go through the
-  shared typed client.
+  Tunnel console shell: toolbar / sidebar / content / status bar, the same
+  frame space-lens uses so this app reads as a native desktop window rather
+  than a centered web page. Polls the daemon every 3s; all mutations go
+  through the shared typed client.
 -->
 <script lang="ts">
   import { onMount, onDestroy } from "svelte";
   import {
-    Activity,
     CircleStop,
     Plus,
     RefreshCw,
@@ -14,13 +14,15 @@
     Wifi,
     WifiOff,
   } from "@lucide/svelte";
-  import TunnelCard from "$lib/TunnelCard.svelte";
+  import TunnelRow from "$lib/TunnelRow.svelte";
   import TunnelEditor from "$lib/TunnelEditor.svelte";
   import {
     getClient,
     initialStore,
     refreshAll,
     refreshHosts,
+    refreshTerminals,
+    type TerminalTarget,
     type TunnelProfile,
     type TunnelProfileInput,
   } from "$lib/store";
@@ -32,10 +34,24 @@
   let editorError: string | null = $state(null);
   let busyIds = $state(new Set<string>());
   let toast = $state<string | null>(null);
-  let inspectCommand: string | null = $state(null);
-  let inspectOpen = $state(false);
   let timer: ReturnType<typeof setInterval> | undefined = undefined;
   let toastTimer: ReturnType<typeof setTimeout> | undefined = undefined;
+
+  // Sidebar filter: all, running, or stopped. Pure view state — the daemon
+  // still owns every profile.
+  let filter = $state<"all" | "live" | "idle">("all");
+
+  const running = $derived(store.states.filter((s) => s.status === "running").length);
+  const failed = $derived(store.states.filter((s) => s.status === "failed").length);
+
+  const visible = $derived(
+    store.profiles.filter((profile) => {
+      if (filter === "all") return true;
+      const status = store.states.find((s) => s.profileId === profile.id)?.status ?? "stopped";
+      const isLive = status === "running" || status === "starting" || status === "degraded";
+      return filter === "live" ? isLive : !isLive;
+    }),
+  );
 
   function say(message: string): void {
     toast = message;
@@ -67,9 +83,6 @@
       await refresh();
     }
   }
-
-  const running = $derived(store.states.filter((s) => s.status === "running").length);
-  const failed = $derived(store.states.filter((s) => s.status === "failed").length);
 
   function openCreate(): void {
     editing = null;
@@ -108,13 +121,26 @@
     await act(id, `deleted ${name}`, () => getClient().deleteProfile(id));
   }
 
-  async function inspect(id: string): Promise<void> {
+  async function copyCommand(id: string): Promise<void> {
     try {
-      const result = await getClient().preview(id);
-      inspectCommand = `$ ${result.command}`;
-      inspectOpen = true;
+      const { command } = await getClient().preview(id);
+      await navigator.clipboard.writeText(command);
+      say("command copied — paste it anywhere");
     } catch (e) {
-      store = { ...store, lastError: e instanceof Error ? e.message : "inspect failed" };
+      store = { ...store, lastError: e instanceof Error ? e.message : "copy failed" };
+    }
+  }
+
+  async function launch(id: string, terminalId: string): Promise<void> {
+    setBusy(id, true);
+    try {
+      const session = await getClient().launchInTerminal(id, terminalId);
+      say(`opened in ${terminalId} (pid ${session.pid})`);
+    } catch (e) {
+      store = { ...store, lastError: e instanceof Error ? e.message : "launch failed" };
+    } finally {
+      setBusy(id, false);
+      await refresh();
     }
   }
 
@@ -128,8 +154,16 @@
     await refresh();
   }
 
+  function terminalLabel(terminalId: string, terminals: readonly TerminalTarget[]): string {
+    return terminals.find((t) => t.id === terminalId)?.label ?? terminalId;
+  }
+
   onMount(() => {
-    void refresh().then(() => refreshHosts(store).then((s) => (store = s)));
+    void (async () => {
+      store = await refreshAll(store);
+      store = await refreshHosts(store);
+      store = await refreshTerminals(store);
+    })();
     timer = setInterval(() => void refresh(), 3000);
     // Test hook: `?editor=open` auto-opens the creation dialog for
     // screenshots and e2e without shipping any test-only UI.
@@ -147,88 +181,128 @@
   });
 </script>
 
-<div class="mx-auto max-w-6xl px-4 pb-16">
-  <!-- Header -->
-  <header class="flex flex-wrap items-end gap-3 border-b border-white/10 py-6">
-    <div>
-      <h1 class="flex items-center gap-2 text-2xl font-bold tracking-tight">
-        <Activity class="text-cyan-400" size={24} />
-        SSH Tunnel
-      </h1>
-      <p class="mt-1 text-sm text-muted-foreground">Remember every tunnel · one click to apply · one click to stop</p>
+<div class="tunnel-shell">
+  <!-- Title bar -->
+  <header class="tunnel-toolbar">
+    <div class="toolbar-title">
+      <strong>SSH Tunnel</strong>
+      <span>one click to apply, one click to stop</span>
     </div>
-    <span class="flex-1"></span>
-    <div class="flex items-center gap-2 font-mono text-xs">
-      <span class="rounded-full bg-emerald-500/10 px-2.5 py-1 text-emerald-300">{running} running</span>
-      {#if failed > 0}
-        <span class="rounded-full bg-red-500/10 px-2.5 py-1 text-red-300">{failed} failed</span>
-      {/if}
-      <span class="rounded-full bg-muted px-2.5 py-1 text-muted-foreground">{store.profiles.length} tunnels</span>
-    </div>
-    <div class="flex items-center gap-1.5 text-xs {store.connected ? 'text-signal-running' : 'text-muted-foreground'}">
-      {#if store.connected}<Wifi size={14} />{:else}<WifiOff size={14} />{/if}
-      {store.connected ? "connected" : store.loading ? "connecting…" : "offline"}
+    <span class="toolbar-spacer"></span>
+    <div class="toolbar-actions">
+      <button class="toolbar-button primary" onclick={openCreate} title="New tunnel">
+        <Plus size={14} /> New tunnel
+      </button>
+      <button class="toolbar-icon" onclick={() => void stopAll()} title="Stop all tunnels" aria-label="Stop all tunnels">
+        <CircleStop size={14} />
+      </button>
+      <button class="toolbar-icon" onclick={() => void refresh()} title="Refresh" aria-label="Refresh">
+        <RefreshCw size={14} />
+      </button>
     </div>
   </header>
 
-  <!-- Toolbar -->
-  <div class="my-4 flex flex-wrap gap-2">
-    <button
-      onclick={openCreate}
-      class="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:bg-primary/85"
-    ><Plus size={16} /> New tunnel</button>
-    <button
-      onclick={stopAll}
-      class="inline-flex items-center gap-1.5 rounded-xl border border-red-500/30 px-4 py-2 text-sm text-red-300 transition hover:bg-red-500/10"
-    ><CircleStop size={16} /> Stop all</button>
-    <button
-      onclick={refresh}
-      class="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-4 py-2 text-sm transition hover:bg-muted"
-    ><RefreshCw size={16} /> Refresh</button>
-    <span class="flex-1"></span>
-    {#if store.hosts.length}
-      <span class="self-center font-mono text-xs text-muted-foreground">{store.hosts.length} ssh hosts</span>
-    {/if}
+  <div class="tunnel-body">
+    <!-- Sidebar -->
+    <aside class="tunnel-sidebar">
+      <div class="sidebar-scroll">
+        <p class="sidebar-heading">Tunnels</p>
+        <button class="sidebar-item" class:selected={filter === "all"} onclick={() => (filter = "all")}>
+          <SquareTerminal size={15} /> <span>All</span>
+          <span class="sidebar-count">{store.profiles.length}</span>
+        </button>
+        <button class="sidebar-item" class:selected={filter === "live"} onclick={() => (filter = "live")}>
+          <Wifi size={15} /> <span>Running</span>
+          <span class="sidebar-count">{running}</span>
+        </button>
+        <button class="sidebar-item" class:selected={filter === "idle"} onclick={() => (filter = "idle")}>
+          <WifiOff size={15} /> <span>Stopped</span>
+          <span class="sidebar-count">{store.profiles.length - running}</span>
+        </button>
+
+        {#if store.hosts.length}
+          <p class="sidebar-heading">SSH hosts</p>
+          {#each store.hosts.slice(0, 12) as host (host.alias)}
+            <div class="sidebar-item" title={host.alias}>
+              <SquareTerminal size={15} /> <span>{host.alias}</span>
+            </div>
+          {/each}
+        {/if}
+
+        {#if store.terminals.length}
+          <p class="sidebar-heading">Terminals</p>
+          {#each store.terminals as terminal (terminal.id)}
+            <div class="sidebar-item" title={terminal.hint}>
+              <SquareTerminal size={15} /> <span>{terminal.label}</span>
+            </div>
+          {/each}
+        {/if}
+      </div>
+    </aside>
+
+    <!-- Content -->
+    <main class="tunnel-content">
+      <div class="content-heading">
+        <h2>Tunnels</h2>
+        <p>{visible.length} of {store.profiles.length} shown</p>
+      </div>
+
+      {#if store.lastError}
+        <p class="mb-3 rounded-[var(--radius)] border border-destructive/40 bg-destructive/10 px-3 py-2 text-[12px] text-destructive">
+          {store.lastError}
+        </p>
+      {/if}
+
+      {#if store.profiles.length === 0 && !store.loading}
+        <div class="content-empty">
+          <SquareTerminal size={30} />
+          <p class="text-[13px] text-foreground">No tunnels yet</p>
+          <p class="text-[12px]">Create one — your SSH aliases are suggested in the target field.</p>
+          <button class="toolbar-button primary mt-2" onclick={openCreate}><Plus size={14} /> New tunnel</button>
+        </div>
+      {:else if visible.length === 0}
+        <div class="content-empty">
+          <p class="text-[12px]">Nothing matches this filter.</p>
+        </div>
+      {:else}
+        <div class="tunnel-table">
+          {#each visible as profile (profile.id)}
+            <TunnelRow
+              {profile}
+              tunnelState={store.states.find((s) => s.profileId === profile.id)}
+              busy={busyIds.has(profile.id)}
+              terminals={store.terminals}
+              onStart={(id) => act(id, "started", () => getClient().start(id))}
+              onStop={(id) => act(id, "stopped", () => getClient().stop(id))}
+              onProbe={(id) => act(id, "probed", () => getClient().probe(id))}
+              onCopy={(id) => void copyCommand(id)}
+              onLaunch={launch}
+              onEdit={openEdit}
+              onDelete={deleteProfile}
+            />
+          {/each}
+        </div>
+      {/if}
+    </main>
   </div>
 
-  {#if store.lastError}
-    <p class="mb-4 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-2 text-sm text-red-300">{store.lastError}</p>
-  {/if}
-
-  <!-- Grid -->
-  {#if store.profiles.length === 0 && !store.loading}
-    <div class="rounded-[10px] border border-dashed border-border px-6 py-16 text-center">
-      <SquareTerminal class="mx-auto text-muted-foreground" size={36} />
-      <p class="mt-3 font-medium">No tunnels yet</p>
-      <p class="mt-1 text-sm text-muted-foreground">Create one — your SSH aliases are suggested in the target field.</p>
-      <button onclick={openCreate} class="mt-4 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/85">
-        + New tunnel
-      </button>
-    </div>
-  {:else}
-    <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-      {#each store.profiles as profile (profile.id)}
-        <TunnelCard
-          {profile}
-          state={store.states.find((s) => s.profileId === profile.id)}
-          busy={busyIds.has(profile.id)}
-          onStart={(id) => act(id, "started", () => getClient().start(id))}
-          onStop={(id) => act(id, "stopped", () => getClient().stop(id))}
-          onProbe={(id) => act(id, "probed", () => getClient().probe(id))}
-          onInspect={inspect}
-          onEdit={openEdit}
-          onDelete={deleteProfile}
-        />
-      {/each}
-    </div>
-  {/if}
-
-  {#if store.hosts.length}
-    <details class="mt-6 text-sm text-muted-foreground">
-      <summary class="cursor-pointer hover:text-foreground">SSH hosts from ~/.ssh/config</summary>
-      <p class="mt-2 font-mono text-xs">{store.hosts.map((h) => h.alias + (h.hostName ? ` (${h.hostName})` : "")).join(" · ")}</p>
-    </details>
-  {/if}
+  <!-- Status bar -->
+  <footer class="tunnel-status">
+    <span><strong>{running}</strong> running</span>
+    <span class="separator">·</span>
+    <span><strong>{store.profiles.length}</strong> tunnels</span>
+    {#if failed > 0}
+      <span class="separator">·</span>
+      <span class="text-destructive"><strong>{failed}</strong> failed</span>
+    {/if}
+    <span class="separator">·</span>
+    <span><strong>{store.hosts.length}</strong> ssh hosts</span>
+    <span style="flex:1"></span>
+    <span class="flex items-center gap-1.5">
+      {#if store.connected}<Wifi size={12} />{:else}<WifiOff size={12} />{/if}
+      {store.connected ? "daemon connected" : store.loading ? "connecting…" : "daemon offline"}
+    </span>
+  </footer>
 </div>
 
 <TunnelEditor
@@ -241,23 +315,8 @@
   onClose={() => (editorOpen = false)}
 />
 
-{#if inspectOpen}
-  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm" role="presentation" tabindex="-1" onclick={() => (inspectOpen = false)} onkeydown={(e) => e.key === "Escape" && (inspectOpen = false)}>
-    <div role="dialog" aria-modal="true" aria-label="Exact ssh command" tabindex="-1"
-      class="w-full max-w-2xl rounded-[10px] border border-border bg-popover p-6 shadow-[0_8px_30px_rgb(0_0_0/0.18)]"
-      onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()}>
-      <h2 class="text-lg font-semibold tracking-tight">Exact ssh command</h2>
-      <p class="mt-1 text-xs text-muted-foreground">This is precisely what the daemon spawns — learn the flags by seeing them.</p>
-      <pre class="mt-3 overflow-x-auto rounded-xl bg-black/40 p-4 font-mono text-xs leading-relaxed text-emerald-200">{inspectCommand ?? ""}</pre>
-      <div class="mt-4 flex justify-end">
-        <button onclick={() => (inspectOpen = false)} class="rounded-lg px-4 py-2 text-sm hover:bg-muted">Close</button>
-      </div>
-    </div>
-  </div>
-{/if}
-
 {#if toast}
-  <div class="fixed bottom-4 left-1/2 z-50 -translate-x-1/2 rounded-xl bg-slate-800 px-4 py-2 text-sm shadow-xl ring-1 ring-white/10">
+  <div class="fixed bottom-10 left-1/2 z-50 -translate-x-1/2 rounded-[var(--radius)] border border-border bg-popover px-3 py-1.5 text-[12px] text-popover-foreground shadow-[0_8px_24px_rgb(0_0_0/0.2)]">
     {toast}
   </div>
 {/if}

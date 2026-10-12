@@ -23,10 +23,13 @@ import {
 } from "@ssh-tunnel/core";
 import type {
   ClockPort,
+  ExternalSession,
   ProbePort,
   ProcessPort,
   SpawnedProcess,
   StorePort,
+  TerminalPort,
+  TerminalTargetInfo,
 } from "@ssh-tunnel/host-node";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
@@ -40,6 +43,8 @@ export interface ManagerOptions {
   readonly sshPath?: string;
   /** Max profiles kept. Default 200. */
   readonly maxProfiles?: number;
+  /** Optional: without it the daemon only exposes "copy the command". */
+  readonly terminal?: TerminalPort;
 }
 
 interface LiveTunnel {
@@ -88,6 +93,8 @@ export class TunnelManager {
   private readonly clock: ClockPort;
   private readonly logDir: string;
   private readonly maxProfiles: number;
+  private readonly terminal: TerminalPort | undefined;
+  private readonly sessions = new Map<string, ExternalSession>();
   private profiles = new Map<string, TunnelProfile>();
   private states = new Map<string, TunnelState>();
   private live = new Map<string, LiveTunnel>();
@@ -100,6 +107,7 @@ export class TunnelManager {
     this.clock = options.clock;
     this.logDir = options.logDir;
     this.maxProfiles = options.maxProfiles ?? 200;
+    this.terminal = options.terminal;
   }
 
   private async ensureLoaded(): Promise<void> {
@@ -223,6 +231,7 @@ export class TunnelManager {
         details: { profileId: id, status: state.status },
       });
     }
+    this.closeSession(id);
     this.profiles.delete(id);
     this.states.delete(id);
     await this.persist();
@@ -494,5 +503,84 @@ export class TunnelManager {
       return buildSshArgv(profile);
     }
     return buildSshArgv(idOrProfile);
+  }
+
+  // -- terminal sessions ----------------------------------------------------
+
+  /** Terminals installed on this host; empty when the port is not wired. */
+  listTerminals(): readonly TerminalTargetInfo[] {
+    return this.terminal?.detect() ?? [];
+  }
+
+  /**
+   * Hand the profile's exact ssh command to a real terminal window. We spawn
+   * that window, so the pid is ours to close — but the tunnel's health stays
+   * defined by port probes, so a user-closed window is reported as stopped,
+   * never as a failure.
+   */
+  launchInTerminal(id: string, terminalId: string): ExternalSession {
+    if (this.terminal === undefined) {
+      throw new TunnelError(
+        "UnsupportedOperation",
+        "this daemon build cannot open terminals",
+        { details: { profileId: id } },
+      );
+    }
+    const profile = this.profiles.get(id);
+    if (profile === undefined) {
+      throw new TunnelError("NotFound", `no profile ${id}`, {
+        details: { profileId: id },
+      });
+    }
+    const known = this.terminal.detect().some((target) => target.id === terminalId);
+    if (!known) {
+      throw new TunnelError("NotFound", `terminal ${terminalId} is not installed`, {
+        details: { profileId: id, terminalId },
+      });
+    }
+    const commandLine = buildSshArgv(profile).command;
+    let pid: number;
+    try {
+      pid = this.terminal.launch(terminalId, commandLine);
+    } catch (e) {
+      throw new TunnelError(
+        "UnsupportedOperation",
+        e instanceof Error ? e.message : "terminal launch failed",
+        { details: { profileId: id, terminalId } },
+      );
+    }
+    if (pid <= 0) {
+      throw new TunnelError(
+        "SshFailed",
+        "terminal launcher exited immediately",
+        { details: { profileId: id, terminalId } },
+      );
+    }
+    const session: ExternalSession = {
+      profileId: id,
+      terminalId,
+      command: commandLine,
+      pid,
+      launchedAt: this.clock.nowIso(),
+    };
+    // One window per profile: relaunching replaces the tracked session.
+    const previous = this.sessions.get(id);
+    if (previous !== undefined) this.terminal.close(previous.pid);
+    this.sessions.set(id, session);
+    return session;
+  }
+
+  /** Sessions this daemon launched, newest launch per profile. */
+  listSessions(): readonly ExternalSession[] {
+    return [...this.sessions.values()];
+  }
+
+  /** End a launched terminal session. Returns false when none was tracked. */
+  closeSession(id: string): boolean {
+    const session = this.sessions.get(id);
+    if (session === undefined) return false;
+    this.terminal?.close(session.pid);
+    this.sessions.delete(id);
+    return true;
   }
 }

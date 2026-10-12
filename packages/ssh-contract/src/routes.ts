@@ -17,6 +17,8 @@ export const TUNNEL_ROUTES = {
   stopAll: { method: "POST", path: "/api/states/stop-all" },
   probeTunnel: { method: "POST", path: "/api/states/:id/probe" },
   listHosts: { method: "GET", path: "/api/ssh-hosts" },
+  listTerminals: { method: "GET", path: "/api/terminals" },
+  launchInTerminal: { method: "POST", path: "/api/profiles/:id/launch" },
 } as const;
 
 export type TunnelRouteName = keyof typeof TUNNEL_ROUTES;
@@ -43,4 +45,8 @@ export function stopPath(id: string): string {
 
 export function probePath(id: string): string {
   return `/api/states/${encodeURIComponent(id)}/probe`;
+}
+
+export function launchPath(id: string): string {
+  return `/api/profiles/${encodeURIComponent(id)}/launch`;
 }

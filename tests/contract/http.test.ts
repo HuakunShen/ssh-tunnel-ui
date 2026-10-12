@@ -5,7 +5,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { TunnelManager, createServiceApp } from "@ssh-tunnel/service";
 import { systemClock } from "@ssh-tunnel/host-node";
-import type { ProbePort, ProcessPort, SpawnedProcess, StorePort } from "@ssh-tunnel/host-node";
+import type { ProbePort, ProcessPort, SpawnedProcess, StorePort, TerminalPort } from "@ssh-tunnel/host-node";
 import type { TunnelProfile } from "@ssh-tunnel/contract";
 
 function fakePorts(): {
@@ -144,5 +144,84 @@ describe("daemon API", () => {
     const again = await post(app, `/api/states/${id}/start`);
     expect(again.status).toBe(409);
     expect((again.json as { problem: { code: string } }).problem.code).toBe("Conflict");
+  });
+
+  describe("terminal sessions", () => {
+    let launched: { terminalId: string; commandLine: string }[];
+    let closed: number[];
+
+    beforeEach(() => {
+      launched = [];
+      closed = [];
+      const ports = fakePorts();
+      spawned = ports.spawned;
+      let nextPid = 60000;
+      const terminal: TerminalPort = {
+        detect: () => [
+          { id: "terminal", label: "Terminal", hint: "com.apple.Terminal", platform: "darwin" },
+          { id: "warp", label: "Warp", hint: "dev.warp.Warp-Stable", platform: "darwin" },
+        ],
+        launch(terminalId, commandLine): number {
+          launched.push({ terminalId, commandLine });
+          return nextPid++;
+        },
+        close(pid): void {
+          closed.push(pid);
+        },
+      };
+      const manager = new TunnelManager({
+        process: ports.process,
+        probe: ports.probe,
+        store: ports.store,
+        clock: systemClock,
+        logDir: "/tmp/ssh-tunnel-test-logs",
+        terminal,
+      });
+      app = createServiceApp({ manager, serviceInstanceId: "test-instance" });
+    });
+
+    it("lists only terminals the host reports", async () => {
+      const { status, json } = await get(app, "/api/terminals");
+      expect(status).toBe(200);
+      expect((json as { terminals: { id: string }[] }).terminals.map((t) => t.id)).toEqual([
+        "terminal",
+        "warp",
+      ]);
+    });
+
+    it("launches the exact ssh command and tracks the session pid", async () => {
+      const created = await post(app, "/api/profiles", INPUT);
+      const id = (created.json as { id: string }).id;
+
+      const result = await post(app, `/api/profiles/${id}/launch`, { terminalId: "warp" });
+      expect(result.status).toBe(200);
+      const body = result.json as { pid: number; command: string; terminalId: string };
+      expect(body.terminalId).toBe("warp");
+      expect(body.pid).toBeGreaterThan(0);
+      // The command handed to the terminal is the same one preview returns.
+      const preview = await get(app, `/api/profiles/${id}/preview`);
+      expect(body.command).toBe((preview.json as { command: string }).command);
+      expect(launched[0]?.commandLine).toContain("-L");
+
+      const closedSession = await app.request(`/api/profiles/${id}/session`, { method: "DELETE" });
+      expect(closedSession.status).toBe(200);
+      expect(closed).toEqual([body.pid]);
+    });
+
+    it("rejects an uninstalled terminal with NotFound (404)", async () => {
+      const created = await post(app, "/api/profiles", INPUT);
+      const id = (created.json as { id: string }).id;
+      const result = await post(app, `/api/profiles/${id}/launch`, { terminalId: "ghostty" });
+      expect(result.status).toBe(404);
+      expect((result.json as { problem: { code: string } }).problem.code).toBe("NotFound");
+    });
+
+    it("relaunching replaces the tracked session", async () => {
+      const created = await post(app, "/api/profiles", INPUT);
+      const id = (created.json as { id: string }).id;
+      const first = await post(app, `/api/profiles/${id}/launch`, { terminalId: "terminal" });
+      await post(app, `/api/profiles/${id}/launch`, { terminalId: "warp" });
+      expect(closed).toEqual([(first.json as { pid: number }).pid]);
+    });
   });
 });

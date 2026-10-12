@@ -6,7 +6,13 @@
 import { serve } from "@hono/node-server";
 import { readFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join, extname, dirname } from "node:path";
-import { createNodeProbePort, createNodeProcessPort, createFileStorePort, systemClock } from "@ssh-tunnel/host-node";
+import {
+  createNodeProbePort,
+  createNodeProcessPort,
+  createFileStorePort,
+  createTerminalPort,
+  systemClock,
+} from "@ssh-tunnel/host-node";
 import { TunnelManager } from "./manager.js";
 import { createServiceApp, SERVICE_VERSION } from "./http.js";
 
@@ -54,6 +60,7 @@ export async function startDaemon(options: ServeOptions = {}): Promise<{ port: n
     store: createFileStorePort(storePath),
     clock: systemClock,
     logDir,
+    terminal: createTerminalPort(),
   });
   const instanceId = `svc-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
   const api = createServiceApp({ manager, serviceInstanceId: instanceId });

@@ -1,5 +1,6 @@
 /**
- * `apps/web` stylesheet: the shared web-ui tokens, then app canvas dressing.
+ * `apps/web` stylesheet: the shared web-ui tokens plus the console shell
+ * geometry, then app canvas dressing.
  *
  * `@source` points Tailwind at the component library's sources — the package
  * is linked into `node_modules`, which Tailwind scans by ignoring it, so
@@ -8,16 +9,37 @@
  */
 @import "tailwindcss";
 @import "@ssh-tunnel/web-ui/styles.css";
+@import "@ssh-tunnel/web-ui/shell.css";
 
 @source "../../../packages/web-ui/src";
 
-html {
-  color-scheme: dark light;
+html,
+body {
+  height: 100%;
+  margin: 0;
+  color-scheme: light dark;
 }
 
 body {
   @apply bg-background text-foreground antialiased;
-  font-family:
-    -apple-system, BlinkMacSystemFont, "SF Pro Text", Inter, ui-sans-serif,
-    system-ui, sans-serif;
+  overflow: hidden;
+}
+
+/* Scrollbars follow the host's own tokens, like space-lens. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--kunkun-scrollbar-thumb) transparent;
+}
+*::-webkit-scrollbar {
+  width: var(--kunkun-scrollbar-size);
+  height: var(--kunkun-scrollbar-size);
+  padding: var(--kunkun-scrollbar-padding);
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--kunkun-scrollbar-thumb);
+  border-radius: 999px;
+  box-shadow: var(--kunkun-scrollbar-thumb-shadow);
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--kunkun-scrollbar-thumb-hover);
 }

@@ -34,6 +34,28 @@ export interface ClockPort {
   nowIso(): string;
 }
 
+/** A terminal the daemon can start a tunnel command in. */
+export interface TerminalTargetInfo {
+  readonly id: string;
+  readonly label: string;
+  readonly hint: string;
+  readonly platform: string;
+}
+
+/**
+ * Terminal launching. The daemon spawns the terminal itself, so the resulting
+ * pid stays ours to end; health is still measured by probing ports, which is
+ * why this is optional rather than required for the daemon to work.
+ */
+export interface TerminalPort {
+  /** Terminals actually installed on this machine. */
+  detect(): readonly TerminalTargetInfo[];
+  /** Launch `commandLine` inside `terminalId`; returns the spawned pid. */
+  launch(terminalId: string, commandLine: string): number;
+  /** End a previously launched terminal session. */
+  close(pid: number): void;
+}
+
 export const systemClock: ClockPort = {
   nowIso(): string {
     return new Date().toISOString();
