@@ -1,0 +1,102 @@
+/**
+ * `@ssh-tunnel/web-ui` shared stylesheet.
+ *
+ * Import once per host (`import "@ssh-tunnel/web-ui/styles.css"`) and add
+ * `@source` for this package so Tailwind generates classes used inside the
+ * library (Tailwind ignores node_modules by default). Platform variants
+ * (`macos:`/`windows:`/`linux:`) follow space-lens: the host sets
+ * `data-interface` on `<html>`, components adapt radii/heights natively.
+ */
+@import "tailwindcss";
+
+@custom-variant dark (&:is(.dark *));
+@custom-variant macos (&:where([data-interface="macos"], [data-interface="macos"] *));
+@custom-variant windows (&:where([data-interface="windows"], [data-interface="windows"] *));
+@custom-variant linux (&:where([data-interface="linux"], [data-interface="linux"] *));
+
+@layer base {
+  :root {
+    --radius: 0.625rem;
+    --background: oklch(0.98 0.005 250);
+    --foreground: oklch(0.18 0.02 250);
+    --card: oklch(1 0 0);
+    --card-foreground: oklch(0.18 0.02 250);
+    --popover: oklch(1 0 0);
+    --popover-foreground: oklch(0.18 0.02 250);
+    --primary: oklch(0.62 0.15 200);
+    --primary-foreground: oklch(0.99 0 0);
+    --secondary: oklch(0.94 0.01 250);
+    --secondary-foreground: oklch(0.25 0.02 250);
+    --muted: oklch(0.94 0.01 250);
+    --muted-foreground: oklch(0.5 0.02 250);
+    --accent: oklch(0.94 0.01 250);
+    --accent-foreground: oklch(0.25 0.02 250);
+    --destructive: oklch(0.577 0.245 27.325);
+    --border: oklch(0.9 0.01 250);
+    --input: oklch(0.9 0.01 250);
+    --ring: oklch(0.62 0.15 200);
+    /* Tunnel signal palette (status dots, badges). */
+    --signal-running: #10b981;
+    --signal-degraded: #f59e0b;
+    --signal-failed: #ef4444;
+    --signal-idle: #64748b;
+    --signal-starting: #06b6d4;
+    color-scheme: light;
+  }
+
+  .dark {
+    --background: oklch(0.13 0.015 250);
+    --foreground: oklch(0.93 0.01 250);
+    --card: oklch(0.17 0.015 250);
+    --card-foreground: oklch(0.93 0.01 250);
+    --popover: oklch(0.17 0.015 250);
+    --popover-foreground: oklch(0.93 0.01 250);
+    --primary: oklch(0.72 0.14 200);
+    --primary-foreground: oklch(0.13 0.015 250);
+    --secondary: oklch(0.24 0.015 250);
+    --secondary-foreground: oklch(0.93 0.01 250);
+    --muted: oklch(0.24 0.015 250);
+    --muted-foreground: oklch(0.65 0.015 250);
+    --accent: oklch(0.24 0.015 250);
+    --accent-foreground: oklch(0.93 0.01 250);
+    --destructive: oklch(0.704 0.191 22.216);
+    --border: oklch(1 0 0 / 10%);
+    --input: oklch(1 0 0 / 12%);
+    --ring: oklch(0.72 0.14 200);
+    --signal-running: #34d399;
+    --signal-degraded: #fbbf24;
+    --signal-failed: #f87171;
+    --signal-idle: #64748b;
+    --signal-starting: #22d3ee;
+    color-scheme: dark;
+  }
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-signal-running: var(--signal-running);
+  --color-signal-degraded: var(--signal-degraded);
+  --color-signal-failed: var(--signal-failed);
+  --color-signal-idle: var(--signal-idle);
+  --color-signal-starting: var(--signal-starting);
+  --radius-lg: var(--radius);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 4px);
+}

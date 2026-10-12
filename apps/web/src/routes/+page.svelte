@@ -131,6 +131,15 @@
   onMount(() => {
     void refresh().then(() => refreshHosts(store).then((s) => (store = s)));
     timer = setInterval(() => void refresh(), 3000);
+    // Test hook: `?editor=open` auto-opens the creation dialog for
+    // screenshots and e2e without shipping any test-only UI.
+    try {
+      if (new URLSearchParams(window.location.search).get("editor") === "open") {
+        editorOpen = true;
+      }
+    } catch {
+      // Non-browser (prerender): ignore.
+    }
   });
   onDestroy(() => {
     if (timer !== undefined) clearInterval(timer);
@@ -234,8 +243,7 @@
 
 {#if inspectOpen}
   <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm" role="presentation" tabindex="-1" onclick={() => (inspectOpen = false)} onkeydown={(e) => e.key === "Escape" && (inspectOpen = false)}>
-    <!-- svelte-ignore a11y_interactive_supports_focus -->
-    <div role="dialog" aria-modal="true" aria-label="Exact ssh command"
+    <div role="dialog" aria-modal="true" aria-label="Exact ssh command" tabindex="-1"
       class="w-full max-w-2xl rounded-2xl border border-white/10 bg-slate-900 p-6 shadow-2xl"
       onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()}>
       <h2 class="text-lg font-semibold tracking-tight">Exact ssh command</h2>

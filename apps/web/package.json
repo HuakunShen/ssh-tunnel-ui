@@ -9,12 +9,13 @@
     "build": "bun ./scripts/build.ts",
     "preview": "vite preview",
     "prepare": "svelte-kit sync || echo ''",
-    "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json"
+    "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --threshold error"
   },
   "dependencies": {
     "@lucide/svelte": "catalog:",
     "@ssh-tunnel/client": "workspace:*",
-    "@ssh-tunnel/contract": "workspace:*"
+    "@ssh-tunnel/contract": "workspace:*",
+    "@ssh-tunnel/web-ui": "workspace:*"
   },
   "devDependencies": {
     "@ssh-tunnel/build-helper": "workspace:*",
