@@ -30,6 +30,32 @@ describe("SSH Tunnel desktop app", () => {
     expect(await action.isDisplayed()).toBe(true);
   });
 
+  it("publishes the native material and makes it adjustable", async () => {
+    // The host only publishes a backdrop after the material really installed,
+    // and only a little after launch: publishing earlier would deadlock the
+    // webview that is still starting.
+    // This service resolves `execute` to the bare value, not a { value } envelope.
+    await browser.waitUntil(
+      async () =>
+        (await browser.execute(() => document.documentElement.dataset.backdrop ?? "")) !== "",
+      { timeout: 30000, timeoutMsg: "no backdrop was ever published" },
+    );
+    const backdrop = await browser.execute(() => document.documentElement.dataset.backdrop);
+    // A browser has nothing to be translucent over, so this must not silently
+    // degrade to "none" in the packaged app.
+    expect(backdrop).toMatch(/^(glass|vibrancy)$/);
+
+    // One knob drives every surface, so moving it must move them together.
+    const read = async () =>
+      await browser.execute(() =>
+        getComputedStyle(document.documentElement).getPropertyValue("--material-opacity").trim(),
+      );
+    const before = await read();
+    expect(before).not.toBe("");
+    await browser.execute(() => document.documentElement.style.setProperty("--material-opacity", "0.5"));
+    expect(await read()).toBe("0.5");
+  });
+
   it("captures the console window for the gallery", async () => {
     // Best-effort wait for populated cards (daemon data may lag first
     // paint), then screenshot regardless — the image itself is the evidence
