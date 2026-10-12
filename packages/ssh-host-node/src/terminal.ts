@@ -11,7 +11,7 @@
  * discovery is pure filesystem probing — nothing here runs a candidate.
  */
 import { spawn } from "node:child_process";
-import { accessSync, constants, statSync } from "node:fs";
+import { accessSync, constants, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { homedir, platform } from "node:os";
 import type { TerminalPort, TerminalTargetInfo } from "./ports.js";
@@ -48,13 +48,44 @@ function whichOnPath(command: string): string | undefined {
   return undefined;
 }
 
-function inApplications(app: string): string | undefined {
-  const home = homedir();
-  for (const dir of ["/Applications", join(home, "Applications")]) {
-    const candidate = join(dir, `${app}.app`, "Contents", "MacOS", app);
-    if (canRead(candidate)) return candidate;
+/** Directories macOS keeps app bundles in, in the order Finder lists them. */
+function applicationDirectories(): readonly string[] {
+  return [
+    "/Applications",
+    "/System/Applications",
+    "/System/Applications/Utilities",
+    join(homedir(), "Applications"),
+  ];
+}
+
+/**
+ * Resolve a bundle to its launcher executable. The binary inside a bundle is
+ * not required to match the app name, so pick the one that exists and is
+ * executable rather than assuming.
+ */
+function bundleExecutable(app: string): string | undefined {
+  for (const dir of applicationDirectories()) {
+    const macos = join(dir, `${app}.app`, "Contents", "MacOS");
+    let entries: string[];
+    try {
+      entries = readdirSync(macos);
+    } catch {
+      continue;
+    }
+    const binary = entries.find((name) => !name.endsWith(".app") && canRead(join(macos, name)));
+    if (binary !== undefined) return join(macos, binary);
   }
   return undefined;
+}
+
+/** Quote a string for an AppleScript literal (backslash and double quote). */
+function appleScriptString(value: string): string {
+  return `"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
+}
+
+/** POSIX single-quoting for the shell literal we build inside AppleScript. */
+function shellSingleQuoted(value: string): string {
+  return `'${value.replace(/'/g, "'\\''")}'`;
 }
 
 const macTargets: readonly TerminalTarget[] = [
@@ -63,16 +94,24 @@ const macTargets: readonly TerminalTarget[] = [
     label: "Terminal",
     hint: "com.apple.Terminal",
     platform: "darwin",
-    command: "open",
-    argvFor: (cmd) => ["-a", "Terminal", "/bin/zsh", "-lc", cmd],
+    command: "osascript",
+    // `open -a Terminal <argv>` is ignored by Terminal.app; AppleScript's
+    // `do script` is the documented way to run a command in a new tab.
+    argvFor: (cmd) => [
+      "-e",
+      `tell application "Terminal" to do script ${appleScriptString(`cd ${shellSingleQuoted("~")}\n${cmd}`)}`,
+    ],
   },
   {
     id: "iterm2",
     label: "iTerm2",
     hint: "com.googlecode.iterm2",
     platform: "darwin",
-    command: "open",
-    argvFor: (cmd) => ["-a", "iTerm", "/bin/zsh", "-lc", cmd],
+    command: "osascript",
+    argvFor: (cmd) => [
+      "-e",
+      `tell application "iTerm" to create window with default profile command ${appleScriptString(cmd)}`,
+    ],
   },
   {
     id: "warp",
@@ -187,13 +226,15 @@ const windowsTargets: readonly TerminalTarget[] = [
 ];
 
 /**
- * `.app` bundle names proving installation — a terminal may exist with no PATH
- * shim (Warp ships none by default), so the bundle is the real signal.
+ * Bundle names proving installation. A terminal may ship no PATH shim at all
+ * (Warp), and the executable inside a bundle does not have to match the app
+ * name (iTerm.app contains `iTerm2`), so detection looks for the bundle and
+ * never guesses the binary.
  */
 const macBundleProbe: Readonly<Record<string, readonly string[]>> = {
   terminal: ["Terminal"],
-  iterm2: ["iTerm"],
-  warp: ["Warp"],
+  iterm2: ["iTerm", "iTerm2"],
+  warp: ["Warp", "WarpPreview"],
   ghostty: ["Ghostty"],
   kitty: ["kitty"],
   wezterm: ["WezTerm"],
@@ -220,11 +261,12 @@ export function detectTerminals(
     let absolutePath: string | undefined;
     if (hostPlatform === "darwin") {
       for (const app of macBundleProbe[target.id] ?? []) {
-        absolutePath = inApplications(app);
+        absolutePath = bundleExecutable(app);
         if (absolutePath !== undefined) break;
       }
-      // Bundle apps launch through `open -a`, which needs no PATH entry.
-      if (absolutePath === undefined && target.command !== "open") continue;
+      // The bundle is the installation signal: PATH shims are absent for most
+      // of these apps, and `osascript`/`open` launchers must not count.
+      if (absolutePath === undefined) continue;
     } else if (whichOnPath(target.command) === undefined) {
       continue;
     }
@@ -248,6 +290,13 @@ export interface ExternalSession {
   readonly pid: number;
   readonly launchedAt: string;
 }
+
+/**
+ * How long a launcher process may live. A CLI terminal exits as soon as the
+ * command does; a GUI app's launcher either exits immediately or not at all, so
+ * this only ever reaps the latter.
+ */
+const LAUNCHER_GRACE_MS = 15_000;
 
 export function createTerminalPort(
   hostPlatform: NodeJS.Platform = platform(),
@@ -283,7 +332,21 @@ export function createTerminalPort(
         // clean up: the tunnel runs inside the terminal, not under this pid.
       });
       child.unref();
-      return child.pid ?? -1;
+      const pid = child.pid;
+      // A GUI app may never exit its launcher (Terminal.app stays running once
+      // open, and an AppleScript call can block on a consent dialog). Give the
+      // launcher a bounded life so it never accumulates as a daemon zombie.
+      if (pid !== undefined) {
+        const reaper = setTimeout(() => {
+          try {
+            process.kill(pid, "SIGTERM");
+          } catch {
+            // Already exited.
+          }
+        }, LAUNCHER_GRACE_MS);
+        reaper.unref();
+      }
+      return pid ?? -1;
     },
 
     close(pid: number): void {

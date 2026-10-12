@@ -12,10 +12,16 @@ describe("SSH Tunnel desktop app", () => {
     expect(await browser.getTitle()).toContain("SSH Tunnel");
   });
 
-  it("renders the tunnel console heading", async () => {
-    const heading = await browser.$("h1=SSH Tunnel");
-    await heading.waitForExist({ timeout: 30000 });
-    expect(await heading.isDisplayed()).toBe(true);
+  it("renders the console shell: toolbar, sidebar, content", async () => {
+    const toolbar = await browser.$(".tunnel-toolbar");
+    await toolbar.waitForExist({ timeout: 30000 });
+    expect(await toolbar.isDisplayed()).toBe(true);
+
+    const sidebar = await browser.$(".tunnel-sidebar");
+    expect(await sidebar.isDisplayed()).toBe(true);
+
+    const content = await browser.$(".tunnel-content");
+    expect(await content.isDisplayed()).toBe(true);
   });
 
   it("shows the New tunnel action", async () => {
@@ -30,8 +36,8 @@ describe("SSH Tunnel desktop app", () => {
     // of what the window shows.
     await browser
       .waitUntil(
-        async () => (await browser.$$("article")).length > 0,
-        { timeout: 30000, timeoutMsg: "no tunnel cards rendered" },
+        async () => (await browser.$$(".tunnel-row")).length > 0,
+        { timeout: 30000, timeoutMsg: "no tunnel rows rendered" },
       )
       .catch(() => undefined);
     // WDIO screenshots the WebView directly (not the system compositor),
