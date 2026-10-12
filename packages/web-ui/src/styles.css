@@ -27,6 +27,13 @@
     --kunkun-scrollbar-thumb: rgb(0 0 0 / 22%);
     --kunkun-scrollbar-thumb-hover: rgb(0 0 0 / 34%);
     --kunkun-scrollbar-thumb-shadow: inset 0 0 0 1px rgb(255 255 255 / 20%);
+    /* Floating control surfaces: rim light, edge and shade around a blurred
+       fill, so grouped toolbar actions read as one physical object. */
+    --glass-fill: rgb(255 255 255 / 72%);
+    --glass-rim: rgb(255 255 255 / 82%);
+    --glass-edge: rgb(0 0 0 / 12%);
+    --glass-shade: rgb(0 0 0 / 10%);
+    --glass-active: rgb(255 255 255 / 84%);
     --background: oklch(1 0 0);
     --foreground: oklch(0.145 0 0);
     --card: oklch(1 0 0);
@@ -67,6 +74,11 @@
   }
 
   .dark {
+    --glass-fill: rgb(37 37 37 / 68%);
+    --glass-rim: rgb(255 255 255 / 25%);
+    --glass-edge: rgb(255 255 255 / 15%);
+    --glass-shade: rgb(0 0 0 / 28%);
+    --glass-active: rgb(255 255 255 / 12%);
     --kunkun-scrollbar-thumb: rgb(255 255 255 / 24%);
     --kunkun-scrollbar-thumb-hover: rgb(255 255 255 / 34%);
     --kunkun-scrollbar-thumb-shadow: inset 0 0 0 1px rgb(255 255 255 / 10%);

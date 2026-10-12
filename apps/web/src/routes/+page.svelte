@@ -189,7 +189,7 @@
       <span>one click to apply, one click to stop</span>
     </div>
     <span class="toolbar-spacer"></span>
-    <div class="toolbar-actions">
+    <div class="toolbar-actions glass-controls">
       <button class="toolbar-button primary" onclick={openCreate} title="New tunnel">
         <Plus size={14} /> New tunnel
       </button>
@@ -288,18 +288,19 @@
 
   <!-- Status bar -->
   <footer class="tunnel-status">
-    <span><strong>{running}</strong> running</span>
-    <span class="separator">·</span>
-    <span><strong>{store.profiles.length}</strong> tunnels</span>
-    {#if failed > 0}
+    <span>
+      <strong>{running}</strong> running
       <span class="separator">·</span>
-      <span class="text-destructive"><strong>{failed}</strong> failed</span>
-    {/if}
-    <span class="separator">·</span>
-    <span><strong>{store.hosts.length}</strong> ssh hosts</span>
-    <span style="flex:1"></span>
-    <span class="flex items-center gap-1.5">
-      {#if store.connected}<Wifi size={12} />{:else}<WifiOff size={12} />{/if}
+      <strong>{store.profiles.length}</strong> tunnels
+      {#if failed > 0}
+        <span class="separator">·</span>
+        <strong class="text-destructive">{failed}</strong> failed
+      {/if}
+      <span class="separator">·</span>
+      <strong>{store.hosts.length}</strong> ssh hosts
+    </span>
+    <span>
+      <i class:offline={!store.connected}></i>
       {store.connected ? "daemon connected" : store.loading ? "connecting…" : "daemon offline"}
     </span>
   </footer>

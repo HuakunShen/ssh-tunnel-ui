@@ -12,6 +12,9 @@
     const dark = window.matchMedia("(prefers-color-scheme: dark)");
     const params = new URLSearchParams(window.location.search);
     const themeParam = params.get("theme");
+    // The desktop shell draws macOS traffic lights over the page (Overlay
+    // title bar), so only that shell needs the toolbar inset.
+    const nativeChrome = window.location.protocol === "tauri:";
     const apply = (): void => {
       // `?theme=dark|light` overrides the OS for screenshots and e2e.
       const isDark = themeParam === "dark" ? true : themeParam === "light" ? false : dark.matches;
@@ -21,6 +24,9 @@
         : navigator.userAgent.includes("Windows") ? "windows"
         : "linux";
       document.documentElement.dataset["interface"] = platform;
+      if (nativeChrome) {
+        document.documentElement.dataset["nativeChrome"] = "true";
+      }
     };
     apply();
     dark.addEventListener("change", apply);

@@ -105,11 +105,11 @@
 
   <div class="min-w-0 flex-1">
     <div class="flex items-center gap-8">
-      <span class="truncate text-[13px] font-medium">{profile.name}</span>
-      <span class="shrink-0 text-[11px] text-muted-foreground">{modeLabel}</span>
-      <span class="shrink-0 text-[11px] capitalize text-muted-foreground">{status}</span>
+      <span class="row-name">{profile.name}</span>
+      <span class="row-detail">{modeLabel}</span>
+      <span class="row-detail capitalize">{status}</span>
     </div>
-    <div class="mt-0.5 flex flex-wrap items-center gap-x-3 font-mono text-[11px] text-muted-foreground">
+    <div class="row-detail mt-[3px] flex flex-wrap items-center gap-x-3 font-mono">
       <span class="truncate">
         {profile.sshTarget}{#if profile.jumpHops?.length}&nbsp;via&nbsp;{profile.jumpHops.join(", ")}{/if}
       </span>
@@ -118,11 +118,11 @@
       {/each}
     </div>
     {#if tunnelState?.lastError}
-      <p class="mt-1 truncate text-[11px] text-destructive" title={tunnelState.lastError}>{tunnelState.lastError}</p>
+      <p class="mt-1 truncate text-[10px] text-destructive" title={tunnelState.lastError}>{tunnelState.lastError}</p>
     {/if}
   </div>
 
-  <div class="flex shrink-0 items-center gap-1">
+  <div class="row-actions shrink-0">
     {#if live}
       <button class="toolbar-button" disabled={busy} onclick={() => onStop(profile.id)} title="Stop tunnel">
         <CircleStop size={13} /> Stop
