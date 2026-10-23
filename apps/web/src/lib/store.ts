@@ -8,6 +8,7 @@
  */
 import { createTunnelClient, type TunnelClient } from "@ssh-tunnel/client";
 import type {
+  LaunchMode,
   SshHostInfo,
   TerminalTarget,
   TunnelProfile,
@@ -15,7 +16,14 @@ import type {
   TunnelState,
 } from "@ssh-tunnel/contract";
 
-export type { TunnelProfile, TunnelProfileInput, TunnelState, SshHostInfo, TerminalTarget };
+export type {
+  LaunchMode,
+  TunnelProfile,
+  TunnelProfileInput,
+  TunnelState,
+  SshHostInfo,
+  TerminalTarget,
+};
 
 function baseUrl(): string {
   // Same-origin when served by the daemon; `?daemon=` override for dev

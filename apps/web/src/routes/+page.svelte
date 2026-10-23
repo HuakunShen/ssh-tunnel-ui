@@ -24,6 +24,7 @@
     refreshAll,
     refreshHosts,
     refreshTerminals,
+    type LaunchMode,
     type TerminalTarget,
     type TunnelProfile,
     type TunnelProfileInput,
@@ -183,11 +184,15 @@
     }
   }
 
-  async function launch(id: string, terminalId: string): Promise<void> {
+  async function launch(id: string, terminalId: string, mode: LaunchMode): Promise<void> {
     setBusy(id, true);
     try {
-      const session = await getClient().launchInTerminal(id, terminalId);
-      say(`opened in ${terminalId} (pid ${session.pid})`);
+      const session = await getClient().launchInTerminal(id, terminalId, mode);
+      say(
+        mode === "shell"
+          ? `opened a shell in ${terminalId} (pid ${session.pid})`
+          : `opened in ${terminalId} (pid ${session.pid})`,
+      );
     } catch (e) {
       store = { ...store, lastError: e instanceof Error ? e.message : "launch failed" };
     } finally {

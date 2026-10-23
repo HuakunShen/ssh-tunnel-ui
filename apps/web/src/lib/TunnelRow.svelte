@@ -18,7 +18,13 @@
     Trash,
   } from "@lucide/svelte";
   import { endpointSummary, localForwardEndpoint, type LocalEndpoint } from "@ssh-tunnel/core";
-  import { openUrl, type TerminalTarget, type TunnelProfile, type TunnelState } from "$lib/store";
+  import {
+    openUrl,
+    type LaunchMode,
+    type TerminalTarget,
+    type TunnelProfile,
+    type TunnelState,
+  } from "$lib/store";
 
   interface Props {
     profile: TunnelProfile;
@@ -29,7 +35,7 @@
     onStop: (id: string) => void;
     onProbe: (id: string) => void;
     onCopy: (id: string) => void;
-    onLaunch: (id: string, terminalId: string) => void;
+    onLaunch: (id: string, terminalId: string, mode: LaunchMode) => void;
     onEdit: (profile: TunnelProfile) => void;
     onDelete: (id: string, name: string) => void;
   }
@@ -130,9 +136,9 @@
     setTimeout(() => (endpointCopied = false), 1600);
   }
 
-  function pick(terminalId: string): void {
+  function pick(terminalId: string, mode: LaunchMode): void {
     menuOpen = false;
-    onLaunch(profile.id, terminalId);
+    onLaunch(profile.id, terminalId, mode);
   }
 
   async function copy(): Promise<void> {
@@ -152,6 +158,15 @@
       <span class="row-name">{profile.name}</span>
       <span class="row-detail">{modeLabel}</span>
       <span class="row-detail capitalize">{status}</span>
+      {#if tunnelState?.origin === "terminal" && live}
+        <span class="row-detail" title="Opened in a terminal window; state comes from its SSH control socket">
+          terminal
+        </span>
+      {:else if tunnelState?.origin === "external" && live}
+        <span class="row-detail" title="Not started by this app; state comes from the bind port">
+          external
+        </span>
+      {/if}
     </div>
     <div class="row-detail mt-[3px] flex flex-wrap items-center gap-x-3 font-mono">
       <span class="truncate">
@@ -236,17 +251,37 @@
             tabindex="-1"
             onkeydown={(e) => { if (e.key === "Escape") menuOpen = false; }}
           >
-            <p class="px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Open in</p>
+            <p class="px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+              Tunnel only
+            </p>
             {#each terminals as terminal (terminal.id)}
               <button
                 class="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[12px] hover:bg-accent"
                 role="menuitem"
-                onclick={() => pick(terminal.id)}
+                onclick={() => pick(terminal.id, "tunnel")}
               >
                 <ExternalLink size={12} class="text-muted-foreground" />
                 <span class="flex-1 truncate">{terminal.label}</span>
+                <span class="font-mono text-[10px] text-muted-foreground">-N</span>
               </button>
-          {/each}
+            {/each}
+            <p
+              class="mt-1 border-t border-border/60 px-3 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground"
+              title="The forwards live and die with the shell session"
+            >
+              Interactive shell
+            </p>
+            {#each terminals as terminal (terminal.id)}
+              <button
+                class="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[12px] hover:bg-accent"
+                role="menuitem"
+                onclick={() => pick(terminal.id, "shell")}
+              >
+                <TerminalIcon size={12} class="text-muted-foreground" />
+                <span class="flex-1 truncate">{terminal.label}</span>
+                <span class="font-mono text-[10px] text-muted-foreground">shell</span>
+              </button>
+            {/each}
         </div>
       {/if}
     </div>
