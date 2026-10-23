@@ -62,18 +62,18 @@ jobs:
         run: pnpm build
 
       - name: Build the app and its disk image
-        run: pnpm run build:app -- --target aarch64-apple-darwin --bundles app,dmg
+        run: pnpm run build:app -- --bundles app,dmg
         working-directory: apps/desktop
 
       - name: Archive the .app
         run: |
-          cd apps/desktop/src-tauri/target/aarch64-apple-darwin/release/bundle/macos
+          cd apps/desktop/src-tauri/target/release/bundle/macos
           ditto -c -k --sequesterRsrc --keepParent "SSH Tunnel.app" \
             "$GITHUB_WORKSPACE/SSH-Tunnel-macos-arm64.zip"
 
       - name: Collect the disk image
         run: |
-          cp apps/desktop/src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg \
+          cp apps/desktop/src-tauri/target/release/bundle/dmg/*.dmg \
             "$GITHUB_WORKSPACE/SSH-Tunnel-macos-arm64.dmg"
 
       - name: Publish the release

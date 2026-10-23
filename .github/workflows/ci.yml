@@ -42,8 +42,10 @@ jobs:
       - name: Package boundaries
         run: pnpm check:boundaries
 
-      - name: Tests
-        run: pnpm test:ci
-
+      # The build stages the Web UI into the DSH plugin package, which one of
+      # the contract tests serves; run it before the suite, not after.
       - name: Build the daemon, CLI, TUI and Web UI
         run: pnpm build
+
+      - name: Tests
+        run: pnpm test:ci
