@@ -18,7 +18,16 @@ fn daemon_url() -> String {
     format!("http://{DAEMON_HOST}:{DAEMON_PORT}")
 }
 
-/// Search `dir` (max 4 levels) for a file with one of `names`.
+/// Deepest nesting Tauri can produce for a bundled resource.
+///
+/// `bundle.resources` entries outside the crate are rewritten with one `_up_`
+/// segment per `..`, so `../../web/dist` lands at `_up_/_up_/web/dist` and the
+/// file itself sits five levels below `Resources`. A smaller budget silently
+/// fell through to the workspace build and made the shipped app depend on the
+/// repository being present.
+const RESOURCE_SEARCH_DEPTH: u8 = 8;
+
+/// Search `dir` (max `RESOURCE_SEARCH_DEPTH` levels) for a file with one of `names`.
 fn find_file(dir: &std::path::Path, names: &[&str]) -> Option<PathBuf> {
     fn walk(dir: &std::path::Path, names: &[&str], depth: u8, out: &mut Option<PathBuf>) {
         if out.is_some() || depth == 0 {
@@ -42,7 +51,7 @@ fn find_file(dir: &std::path::Path, names: &[&str]) -> Option<PathBuf> {
         }
     }
     let mut found = None;
-    walk(dir, names, 4, &mut found);
+    walk(dir, names, RESOURCE_SEARCH_DEPTH, &mut found);
     found
 }
 
@@ -335,13 +344,34 @@ mod tests {
     }
 
     #[test]
-    fn find_file_respects_depth_limit() {
+    fn find_file_reaches_tauri_resource_nesting() {
         let dir = std::env::temp_dir().join(format!("ssh-tunnel-depth-{}", std::process::id()));
-        let deep = dir.join("1").join("2").join("3").join("4").join("5");
-        fs::create_dir_all(&deep).unwrap();
-        fs::write(deep.join("server.mjs"), "console.log(1)").unwrap();
-        // Depth budget is 4 levels: 5-deep file stays invisible.
-        assert_eq!(find_file(&dir, &["server.mjs"]), None);
+        // The layout a bundle really has: ../../web/dist -> _up_/_up_/web/dist.
+        let bundled = dir
+            .join("_up_")
+            .join("_up_")
+            .join("web")
+            .join("dist");
+        fs::create_dir_all(&bundled).unwrap();
+        fs::write(bundled.join("index.html"), "<!doctype html>").unwrap();
+        assert_eq!(
+            find_file(&dir, &["index.html"]),
+            Some(bundled.join("index.html"))
+        );
+
+        // Nine levels is past the budget, so a pathological tree stays bounded.
+        let too_deep = dir
+            .join("1")
+            .join("2")
+            .join("3")
+            .join("4")
+            .join("5")
+            .join("6")
+            .join("7")
+            .join("8");
+        fs::create_dir_all(&too_deep).unwrap();
+        fs::write(too_deep.join("only-here.mjs"), "x").unwrap();
+        assert_eq!(find_file(&dir, &["only-here.mjs"]), None);
         fs::remove_dir_all(&dir).unwrap();
     }
 }
