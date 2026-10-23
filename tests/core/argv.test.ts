@@ -93,6 +93,36 @@ describe("buildSshArgv", () => {
     expect(argv).toContain("GatewayPorts=yes");
   });
 
+  it("adds a control socket only when asked, and never for the advertised command", () => {
+    const plain = buildSshArgv(baseProfile());
+    const controlled = buildSshArgv(baseProfile(), {
+      controlPath: "/tmp/ssh-tunnel-ui/control/t-test.sock",
+    });
+    expect(plain.argv).not.toContain("ControlMaster=yes");
+    expect(controlled.argv).toContain("ControlMaster=yes");
+    expect(controlled.argv).toContain("ControlPath=/tmp/ssh-tunnel-ui/control/t-test.sock");
+    expect(controlled.argv).toContain("ControlPersist=no");
+    // The forwarding surface is untouched by the extra options.
+    expect(controlled.argv).toContain("18080:127.0.0.1:80");
+    expect(controlled.argv.at(-1)).toBe("-N");
+  });
+
+  it("drops -N in interactive mode so the window gets a prompt", () => {
+    const { argv } = buildSshArgv(baseProfile(), { interactive: true });
+    expect(argv).not.toContain("-N");
+    expect(argv.at(-1)).toBe("ufo");
+    // A shell must be able to ask for a password; a detached tunnel must not.
+    expect(argv).not.toContain("BatchMode=yes");
+    expect(buildSshArgv(baseProfile()).argv).toContain("BatchMode=yes");
+    // An explicit remote command is a tunnel mode concern, not a shell one.
+    const withCommand = buildSshArgv(
+      baseProfile({ noRemoteCommand: false, remoteCommand: "uptime" }),
+      { interactive: true },
+    );
+    expect(withCommand.argv).not.toContain("uptime");
+    expect(withCommand.argv).not.toContain("-N");
+  });
+
   it("bind addresses render into specs", () => {
     const { argv } = buildSshArgv(
       baseProfile({

@@ -135,6 +135,27 @@ export type TunnelStatus = (typeof TUNNEL_STATUSES)[number];
 
 export const tunnelStatusSchema = z.enum(TUNNEL_STATUSES);
 
+/**
+ * Who started a tunnel, and therefore what this daemon can honestly say.
+ *
+ * `managed` tunnels are children this daemon spawned and can signal; `terminal`
+ * tunnels ran the same command in the user's own terminal window and are
+ * reachable through their `ControlMaster` socket; `external` tunnels were not
+ * started here at all and are only inferred from a listening bind port.
+ */
+export const TUNNEL_ORIGINS = ["managed", "terminal", "external"] as const;
+
+export type TunnelOrigin = (typeof TUNNEL_ORIGINS)[number];
+
+export const tunnelOriginSchema = z.enum(TUNNEL_ORIGINS);
+
+/** `tunnel` keeps `-N`; `shell` gives the window an interactive login shell. */
+export const LAUNCH_MODES = ["tunnel", "shell"] as const;
+
+export type LaunchMode = (typeof LAUNCH_MODES)[number];
+
+export const launchModeSchema = z.enum(LAUNCH_MODES);
+
 export const forwardHealthSchema = z.strictObject({
   kind: z.enum(["local", "remote", "dynamic"]),
   bindPort: portSchema,
@@ -148,6 +169,7 @@ export type ForwardHealth = z.infer<typeof forwardHealthSchema>;
 export const tunnelStateSchema = z.strictObject({
   profileId: z.string().min(1).max(64),
   status: tunnelStatusSchema,
+  origin: tunnelOriginSchema.optional(),
   pid: z.number().int().positive().optional(),
   startedAt: z.string().optional(),
   lastError: z.string().max(2000).optional(),
@@ -207,6 +229,8 @@ export const terminalListResponseSchema = z.strictObject({
 
 export const launchRequestSchema = z.strictObject({
   terminalId: z.string().min(1).max(32),
+  /** Default `tunnel`: the window runs `ssh -N`. `shell` gives it a prompt. */
+  mode: launchModeSchema.optional(),
 });
 
 /**
@@ -217,6 +241,7 @@ export const launchRequestSchema = z.strictObject({
 export const launchResponseSchema = z.strictObject({
   profileId: z.string().min(1).max(64),
   terminalId: z.string().min(1).max(32),
+  mode: launchModeSchema,
   command: z.string(),
   pid: z.number().int(),
   launchedAt: z.string().min(1),

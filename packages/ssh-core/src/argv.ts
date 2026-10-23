@@ -17,6 +17,18 @@ export interface ArgvBuildResult {
   readonly command: string;
 }
 
+/** Extras the daemon adds for one specific run, never for the advertised one. */
+export interface ArgvOptions {
+  /**
+   * Absolute path of this tunnel's `ControlMaster` socket. Adds
+   * `-o ControlMaster=yes -o ControlPath=… -o ControlPersist=no`, so the
+   * process reports `ssh -O check` and accepts `ssh -O exit` later.
+   */
+  readonly controlPath?: string;
+  /** Give the terminal an interactive login shell instead of `-N`. */
+  readonly interactive?: boolean;
+}
+
 /** Quote one argv element for display only (never for execution). */
 export function quoteForDisplay(argv: readonly string[]): string {
   return ["ssh", ...argv]
@@ -57,12 +69,25 @@ function flagFor(rule: ForwardRule): "-L" | "-R" | "-D" {
 /**
  * Build the argv for `ssh` (without the executable name itself).
  * Throws nothing: callers must pass a schema-validated profile.
+ *
+ * `options` only ever *adds* to the default vector, so the command a profile
+ * advertises (copy/preview) stays byte-identical to what a plain `ssh` run
+ * would be. The daemon passes `controlPath` when the command is handed to a
+ * terminal, which is what lets it check and stop a tunnel it no longer owns.
  */
-export function buildSshArgv(profile: TunnelProfile): ArgvBuildResult {
+export function buildSshArgv(
+  profile: TunnelProfile,
+  options: ArgvOptions = {},
+): ArgvBuildResult {
   const argv: string[] = [];
 
   // Batch + non-interactive first so a missing key fails fast, not on a prompt.
-  argv.push("-o", "BatchMode=yes");
+  // An interactive shell is the exception: the whole point of that window is
+  // that the user can answer a password prompt, and ssh keeps the *first* value
+  // it sees for a repeated option, so this one cannot be overridden later.
+  if (options.interactive !== true) {
+    argv.push("-o", "BatchMode=yes");
+  }
   argv.push("-o", "StrictHostKeyChecking=accept-new");
 
   if (profile.exitOnForwardFailure !== false) {
@@ -96,19 +121,38 @@ export function buildSshArgv(profile: TunnelProfile): ArgvBuildResult {
     argv.push("-o", `${opt.key}=${opt.value}`);
   }
 
-  const destination =
-    profile.sshUser !== undefined && profile.sshUser !== ""
-      ? `${profile.sshUser}@${profile.sshTarget.replace(/^[^@]+@/, "")}`
-      : profile.sshTarget;
-  argv.push(destination);
+  if (options.controlPath !== undefined && options.controlPath !== "") {
+    // One master per profile: the socket is how a later `ssh -O check`/`exit`
+    // finds this very process, even when a terminal owns it instead of us.
+    argv.push(
+      "-o",
+      "ControlMaster=yes",
+      "-o",
+      `ControlPath=${options.controlPath}`,
+      "-o",
+      "ControlPersist=no",
+    );
+  }
 
-  if (profile.noRemoteCommand === false && profile.remoteCommand) {
+  argv.push(sshDestination(profile));
+
+  if (options.interactive === true) {
+    // No `-N`: ssh asks for the login shell, and the forwards live exactly as
+    // long as that session does.
+  } else if (profile.noRemoteCommand === false && profile.remoteCommand) {
     argv.push(profile.remoteCommand);
   } else {
     argv.push("-N");
   }
 
   return { argv, command: quoteForDisplay(argv) };
+}
+
+/** `user@host` as the profile asks for it; also what `-O` commands need. */
+export function sshDestination(profile: TunnelProfile): string {
+  return profile.sshUser !== undefined && profile.sshUser !== ""
+    ? `${profile.sshUser}@${profile.sshTarget.replace(/^[^@]+@/, "")}`
+    : profile.sshTarget;
 }
 
 /** All local bind ports this profile will listen on (for conflict checks). */

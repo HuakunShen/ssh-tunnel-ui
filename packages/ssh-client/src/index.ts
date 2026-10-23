@@ -17,6 +17,7 @@ import {
   tunnelProfileSchema,
   tunnelStateSchema,
   TunnelError,
+  type LaunchMode,
   type SshHostInfo,
   type TerminalTarget,
   type TunnelProblemCode,
@@ -116,9 +117,11 @@ export function createTunnelClient(options: TunnelClientOptions): {
   launchInTerminal(
     id: string,
     terminalId: string,
+    mode?: LaunchMode,
   ): Promise<{
     profileId: string;
     terminalId: string;
+    mode: LaunchMode;
     command: string;
     pid: number;
     launchedAt: string;
@@ -179,9 +182,9 @@ export function createTunnelClient(options: TunnelClientOptions): {
       request(options, "GET", "/api/terminals", (body) =>
         must(terminalListResponseSchema.loose().safeParse(body)).terminals,
       ),
-    launchInTerminal: (id, terminalId) =>
+    launchInTerminal: (id, terminalId, mode) =>
       request(options, "POST", launchPath(id), (body) =>
-        must(launchResponseSchema.loose().safeParse(body)), { terminalId }),
+        must(launchResponseSchema.loose().safeParse(body)), { terminalId, mode }),
     openUrl: (url) =>
       request(options, "POST", "/api/open-url", (body) =>
         must(openUrlResponseSchema.loose().safeParse(body)), { url }),
