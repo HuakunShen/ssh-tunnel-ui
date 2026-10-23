@@ -184,6 +184,7 @@ export function createServiceApp(context: ServiceContext): Hono {
       const session = await context.manager.launchInTerminal(
         c.req.param("id"),
         parsed.data.terminalId,
+        parsed.data.mode ?? "tunnel",
       );
       const checked = launchResponseSchema.safeParse(session);
       if (!checked.success) {

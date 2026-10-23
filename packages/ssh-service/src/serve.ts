@@ -9,6 +9,7 @@ import { join, extname, dirname } from "node:path";
 import {
   createNodeProbePort,
   createNodeProcessPort,
+  createControlPort,
   createFileStorePort,
   createOpenUrlPort,
   createTerminalPort,
@@ -63,6 +64,7 @@ export async function startDaemon(options: ServeOptions = {}): Promise<{ port: n
     logDir,
     terminal: createTerminalPort(),
     openUrl: createOpenUrlPort(),
+    control: createControlPort(options.sshPath ?? "ssh"),
   });
   const instanceId = `svc-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
   const api = createServiceApp({ manager, serviceInstanceId: instanceId });

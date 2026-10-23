@@ -149,10 +149,12 @@ describe("daemon API", () => {
   describe("terminal sessions", () => {
     let launched: { terminalId: string; commandLine: string }[];
     let closed: number[];
+    let exited: string[];
 
     beforeEach(() => {
       launched = [];
       closed = [];
+      exited = [];
       const ports = fakePorts();
       spawned = ports.spawned;
       let nextPid = 60000;
@@ -175,7 +177,17 @@ describe("daemon API", () => {
         store: ports.store,
         clock: systemClock,
         logDir: "/tmp/ssh-tunnel-test-logs",
+        controlDir: "/tmp/ssh-tunnel-test-control",
         terminal,
+        control: {
+          async check(): Promise<boolean> {
+            return false;
+          },
+          async exit(socketPath): Promise<boolean> {
+            exited.push(socketPath);
+            return true;
+          },
+        },
       });
       app = createServiceApp({ manager, serviceInstanceId: "test-instance" });
     });
@@ -195,17 +207,140 @@ describe("daemon API", () => {
 
       const result = await post(app, `/api/profiles/${id}/launch`, { terminalId: "warp" });
       expect(result.status).toBe(200);
-      const body = result.json as { pid: number; command: string; terminalId: string };
+      const body = result.json as {
+        pid: number;
+        command: string;
+        terminalId: string;
+        mode: string;
+      };
       expect(body.terminalId).toBe("warp");
+      expect(body.mode).toBe("tunnel");
       expect(body.pid).toBeGreaterThan(0);
-      // The command handed to the terminal is the same one preview returns.
+      // The window runs the profile's own command plus the control socket that
+      // lets this daemon check and stop a session it does not own. Preview stays
+      // the plain equivalent a user can copy anywhere.
       const preview = await get(app, `/api/profiles/${id}/preview`);
-      expect(body.command).toBe((preview.json as { command: string }).command);
+      const withoutControl = body.command.replace(
+        /-o ControlMaster=yes -o ControlPath=\S+ -o ControlPersist=no /,
+        "",
+      );
+      expect(withoutControl).toBe((preview.json as { command: string }).command);
+      expect(body.command).toContain("ControlPath=");
       expect(launched[0]?.commandLine).toContain("-L");
 
       const closedSession = await app.request(`/api/profiles/${id}/session`, { method: "DELETE" });
       expect(closedSession.status).toBe(200);
       expect(closed).toEqual([body.pid]);
+    });
+
+    it("opens an interactive shell without -N when asked", async () => {
+      const created = await post(app, "/api/profiles", INPUT);
+      const id = (created.json as { id: string }).id;
+      const result = await post(app, `/api/profiles/${id}/launch`, {
+        terminalId: "warp",
+        mode: "shell",
+      });
+      expect(result.status).toBe(200);
+      const body = result.json as { mode: string; command: string };
+      expect(body.mode).toBe("shell");
+      expect(body.command).not.toContain(" -N");
+      expect(body.command).toContain("-L 18099:127.0.0.1:22");
+      expect(launched[0]?.commandLine).toBe(body.command);
+    });
+
+    it("tracks a terminal session through its control socket", async () => {
+      const ports = fakePorts();
+      const sockets: string[] = [];
+      const manager = new TunnelManager({
+        process: ports.process,
+        probe: ports.probe,
+        store: ports.store,
+        clock: systemClock,
+        logDir: "/tmp/ssh-tunnel-test-logs",
+        controlDir: "/tmp/ssh-tunnel-test-control",
+        terminal: {
+          detect: () => [
+            { id: "warp", label: "Warp", hint: "dev.warp.Warp-Stable", platform: "darwin" },
+          ],
+          async launch(): Promise<number> {
+            return 61000;
+          },
+          close(): void {
+            // The window is not ours to signal.
+          },
+        },
+        control: {
+          async check(socketPath): Promise<boolean> {
+            sockets.push(socketPath);
+            return true;
+          },
+          async exit(): Promise<boolean> {
+            return true;
+          },
+        },
+      });
+      const socketApp = createServiceApp({ manager, serviceInstanceId: "test-socket" });
+      const created = await post(socketApp, "/api/profiles", INPUT);
+      const id = (created.json as { id: string }).id;
+      await post(socketApp, `/api/profiles/${id}/launch`, { terminalId: "warp" });
+
+      const states = await get(socketApp, "/api/states");
+      const state = (states.json as { states: { profileId: string; status: string; origin?: string }[] })
+        .states.find((candidate) => candidate.profileId === id);
+      expect(state?.status).toBe("running");
+      expect(state?.origin).toBe("terminal");
+      expect(sockets[0]).toContain(`${id}.sock`);
+    });
+
+    it("keeps a window it just opened while the master is still connecting", async () => {
+      const ports = fakePorts();
+      let now = Date.parse("2026-10-24T00:00:00.000Z");
+      const manager = new TunnelManager({
+        process: ports.process,
+        probe: ports.probe,
+        store: ports.store,
+        clock: { nowIso: () => new Date(now).toISOString() },
+        logDir: "/tmp/ssh-tunnel-test-logs",
+        controlDir: "/tmp/ssh-tunnel-test-control",
+        terminal: {
+          detect: () => [
+            { id: "warp", label: "Warp", hint: "dev.warp.Warp-Stable", platform: "darwin" },
+          ],
+          async launch(): Promise<number> {
+            return 62000;
+          },
+          close(): void {
+            // Nothing to close from here.
+          },
+        },
+        // The socket is not answering yet: ssh is still authenticating.
+        control: {
+          async check(): Promise<boolean> {
+            return false;
+          },
+          async exit(): Promise<boolean> {
+            return true;
+          },
+        },
+      });
+      const graceApp = createServiceApp({ manager, serviceInstanceId: "test-grace" });
+      const created = await post(graceApp, "/api/profiles", INPUT);
+      const id = (created.json as { id: string }).id;
+      await post(graceApp, `/api/profiles/${id}/launch`, { terminalId: "warp" });
+
+      const early = await get(graceApp, "/api/states");
+      const earlyState = (early.json as { states: { profileId: string; status: string; origin?: string }[] })
+        .states.find((candidate) => candidate.profileId === id);
+      expect(earlyState?.status).toBe("starting");
+      expect(earlyState?.origin).toBe("terminal");
+
+      // Past the grace window a silent socket means the window is gone.
+      now += 60_000;
+      const late = await get(graceApp, "/api/states");
+      const lateState = (late.json as { states: { profileId: string; origin?: string }[] }).states.find(
+        (candidate) => candidate.profileId === id,
+      );
+      expect(lateState?.origin).not.toBe("terminal");
     });
 
     it("reports a launcher that refuses the call as TerminalFailed (502)", async () => {
@@ -229,6 +364,7 @@ describe("daemon API", () => {
         store: ports.store,
         clock: systemClock,
         logDir: "/tmp/ssh-tunnel-test-logs",
+        controlDir: "/tmp/ssh-tunnel-test-control",
         terminal: refusing,
       });
       const refusingApp = createServiceApp({ manager, serviceInstanceId: "test-refusing" });

@@ -8,6 +8,7 @@ import {
   TunnelError,
   tunnelProfileSchema,
   type ForwardHealth,
+  type LaunchMode,
   type TunnelProfile,
   type TunnelProfileInput,
   type TunnelState,
@@ -17,6 +18,7 @@ import {
   buildSshArgv,
   canTransition,
   isStoppable,
+  sshDestination,
   startTarget,
   stopTarget,
   validateProfileInput,
@@ -24,6 +26,7 @@ import {
 import { isOpenableUrl } from "@ssh-tunnel/host-node";
 import type {
   ClockPort,
+  ControlPort,
   ExternalSession,
   OpenUrlPort,
   ProbePort,
@@ -33,7 +36,8 @@ import type {
   TerminalPort,
   TerminalTargetInfo,
 } from "@ssh-tunnel/host-node";
-import { mkdirSync } from "node:fs";
+import { existsSync, mkdirSync } from "node:fs";
+import { homedir } from "node:os";
 import { join } from "node:path";
 
 export interface ManagerOptions {
@@ -49,7 +53,18 @@ export interface ManagerOptions {
   readonly terminal?: TerminalPort;
   /** Optional: without it, "open in browser" is refused rather than faked. */
   readonly openUrl?: OpenUrlPort;
+  /** Optional: without it, a terminal-opened tunnel cannot be checked or ended. */
+  readonly control?: ControlPort;
+  /** Where per-profile ControlMaster sockets live. Default `~/.ssh-tunnel-ui/control`. */
+  readonly controlDir?: string;
 }
+
+/**
+ * How long a freshly handed-off window gets before its control socket must
+ * answer. ssh needs a moment to authenticate and bind the master; checking
+ * immediately would call a healthy session dead and, worse, forget it.
+ */
+const TERMINAL_START_GRACE_MS = 12_000;
 
 interface LiveTunnel {
   readonly child: SpawnedProcess;
@@ -99,6 +114,8 @@ export class TunnelManager {
   private readonly maxProfiles: number;
   private readonly terminal: TerminalPort | undefined;
   private readonly openUrlPort: OpenUrlPort | undefined;
+  private readonly control: ControlPort | undefined;
+  private readonly controlDir: string;
   private readonly sessions = new Map<string, ExternalSession>();
   private profiles = new Map<string, TunnelProfile>();
   private states = new Map<string, TunnelState>();
@@ -114,6 +131,8 @@ export class TunnelManager {
     this.maxProfiles = options.maxProfiles ?? 200;
     this.terminal = options.terminal;
     this.openUrlPort = options.openUrl;
+    this.control = options.control;
+    this.controlDir = options.controlDir ?? join(homedir(), ".ssh-tunnel-ui", "control");
   }
 
   private async ensureLoaded(): Promise<void> {
@@ -247,11 +266,15 @@ export class TunnelManager {
 
   async listStates(): Promise<readonly TunnelState[]> {
     await this.ensureLoaded();
+    await this.refreshUnmanaged();
     return [...this.states.values()];
   }
 
   async getState(id: string): Promise<TunnelState> {
     await this.ensureLoaded();
+    // Same refresh the list route does, so one row and the whole table cannot
+    // disagree about who owns a tunnel.
+    await this.refreshUnmanaged();
     const state = this.states.get(id);
     if (state === undefined) {
       throw new TunnelError("NotFound", `no tunnel ${id}`, {
@@ -262,6 +285,11 @@ export class TunnelManager {
   }
 
   private refreshState(id: string, state: TunnelState): TunnelState {
+    // Terminal-opened and externally-detected tunnels have no child of ours to
+    // check: their truth comes from the control socket and the port probe.
+    if (this.sessions.has(id) || state.origin === "terminal" || state.origin === "external") {
+      return state;
+    }
     const live = this.live.get(id);
     if (
       (state.status === "running" || state.status === "degraded") &&
@@ -277,6 +305,129 @@ export class TunnelManager {
       return failed;
     }
     return state;
+  }
+
+
+  private controlPathFor(id: string): string {
+    return join(this.controlDir, `${id}.sock`);
+  }
+
+  /**
+   * Is a master behind this profile's control socket answering?
+   *
+   * The file is checked first: with no socket there is nothing to ask, and a
+   * status poll must not spawn `ssh` per profile every few seconds. A socket
+   * left behind by a killed master answers "not running" and is ignored.
+   */
+  private async socketAlive(id: string, profile: TunnelProfile): Promise<boolean> {
+    if (this.control === undefined) return false;
+    const socketPath = this.controlPathFor(id);
+    if (!existsSync(socketPath)) return false;
+    return this.control.check(socketPath, sshDestination(profile));
+  }
+
+  /** Does any local bind port of this profile answer right now? */
+  private async bindPortAnswers(profile: TunnelProfile): Promise<boolean> {
+    for (const rule of profile.forwards) {
+      if (rule.kind === "remote") continue;
+      const host =
+        rule.bindAddress === undefined ||
+        rule.bindAddress === "" ||
+        rule.bindAddress === "*" ||
+        rule.bindAddress === "0.0.0.0"
+          ? "127.0.0.1"
+          : rule.bindAddress;
+      const result = await this.prober.dialTcp(host, rule.bindPort, 400);
+      if (result.ok) return true;
+    }
+    return false;
+  }
+
+  /**
+   * Bring terminal-opened and foreign tunnels up to date.
+   *
+   * The daemon owns neither, so nothing here trusts memory: a terminal session
+   * is real only while its ControlMaster answers `ssh -O check`, and a tunnel
+   * started outside this app is reported as `external` from the port it holds —
+   * never as something this daemon may stop.
+   */
+  private async refreshUnmanaged(): Promise<void> {
+    for (const [id, state] of [...this.states.entries()]) {
+      const profile = this.profiles.get(id);
+      if (profile === undefined) continue;
+      const session = this.sessions.get(id);
+      if (session !== undefined) {
+        const alive =
+          this.control !== undefined &&
+          (await this.control.check(this.controlPathFor(id), sshDestination(profile)));
+        if (alive) {
+          this.states.set(id, {
+            ...state,
+            status: "running",
+            origin: "terminal",
+            lastError: undefined,
+          });
+          continue;
+        }
+        const ageMs = Date.parse(this.clock.nowIso()) - Date.parse(session.launchedAt);
+        if (ageMs < TERMINAL_START_GRACE_MS) {
+          // Still connecting (a jump hop can take seconds): keep claiming it.
+          this.states.set(id, { ...state, status: "starting", origin: "terminal" });
+          continue;
+        }
+        this.sessions.delete(id);
+        const stillListening = await this.bindPortAnswers(profile);
+        this.states.set(
+          id,
+          stillListening
+            ? {
+                ...state,
+                status: "running",
+                origin: "external",
+                lastError: "the terminal session ended; a listener still holds this port",
+              }
+            : {
+                ...state,
+                status: "stopped",
+                origin: "terminal",
+                pid: undefined,
+                startedAt: undefined,
+                forwards: [],
+              },
+        );
+        continue;
+      }
+      // A managed child of ours is authoritative while it lives.
+      const live = this.live.get(id);
+      if (live !== undefined && this.process.isAlive(live.child.pid)) continue;
+      // A master this daemon did not record but can still reach: a window from
+      // before a restart, or one the user started with the same socket.
+      if (await this.socketAlive(id, profile)) {
+        this.states.set(id, { ...state, status: "running", origin: "terminal", lastError: undefined });
+        continue;
+      }
+      if (state.origin === "external") {
+        if (await this.bindPortAnswers(profile)) continue;
+        this.states.set(id, {
+          ...state,
+          status: "stopped",
+          pid: undefined,
+          startedAt: undefined,
+          forwards: [],
+        });
+        continue;
+      }
+      if (state.status !== "stopped") continue;
+      if (await this.bindPortAnswers(profile)) {
+        this.states.set(id, {
+          profileId: id,
+          status: "running",
+          origin: "external",
+          forwards: [],
+          lastError: "started outside this daemon; state comes from the bind port",
+        });
+      }
+    }
   }
 
   async start(id: string): Promise<TunnelState> {
@@ -373,6 +524,7 @@ export class TunnelManager {
       return failed;
     }
     this.setStatus(id, "running", {
+      origin: "managed",
       pid: live.child.pid,
       startedAt,
       argv: [...live.argv],
@@ -406,7 +558,30 @@ export class TunnelManager {
         { details: { profileId: id, status: refreshed.status } },
       );
     }
+    const session = this.sessions.get(id);
+    const profile = await this.getProfile(id);
+    const socketOwned = this.live.get(id) === undefined && (await this.socketAlive(id, profile));
+    if (
+      session === undefined &&
+      !socketOwned &&
+      this.live.get(id) === undefined &&
+      refreshed.origin === "external"
+    ) {
+      throw new TunnelError(
+        "Conflict",
+        "this tunnel was started outside the daemon; stop it where it was started",
+        { details: { profileId: id } },
+      );
+    }
     this.setStatus(id, "stopping");
+    if (session !== undefined || socketOwned) {
+      // A window we did not spawn: ask OpenSSH to close its master, which ends
+      // the session that owns the forwards.
+      if (this.control !== undefined) {
+        await this.control.exit(this.controlPathFor(id), sshDestination(profile));
+      }
+      this.sessions.delete(id);
+    }
     const live = this.live.get(id);
     if (live !== undefined) {
       this.process.killTree(live.child.pid);
@@ -527,8 +702,17 @@ export class TunnelManager {
    * A launcher that refuses the call (iTerm2 denying automation, a terminal
    * bundle that moved) surfaces as `TerminalFailed` with the launcher's own
    * stderr, rather than a success toast naming a pid nobody can see.
+   *
+   * The command carries a per-profile ControlMaster socket, so the session this
+   * window owns stays checkable (`ssh -O check`) and stoppable (`ssh -O exit`)
+   * even though the daemon never holds its pid. `shell` drops `-N`: the window
+   * is then a real interactive session, and the forwards live and die with it.
    */
-  async launchInTerminal(id: string, terminalId: string): Promise<ExternalSession> {
+  async launchInTerminal(
+    id: string,
+    terminalId: string,
+    mode: LaunchMode = "tunnel",
+  ): Promise<ExternalSession> {
     if (this.terminal === undefined) {
       throw new TunnelError(
         "UnsupportedOperation",
@@ -548,7 +732,15 @@ export class TunnelManager {
         details: { profileId: id, terminalId },
       });
     }
-    const commandLine = buildSshArgv(profile).command;
+    try {
+      mkdirSync(this.controlDir, { recursive: true, mode: 0o700 });
+    } catch {
+      // A missing directory surfaces as a failed ssh below, with its own words.
+    }
+    const commandLine = buildSshArgv(profile, {
+      controlPath: this.controlPathFor(id),
+      interactive: mode === "shell",
+    }).command;
     let pid: number;
     try {
       pid = await this.terminal.launch(terminalId, commandLine);
@@ -569,6 +761,7 @@ export class TunnelManager {
     const session: ExternalSession = {
       profileId: id,
       terminalId,
+      mode,
       command: commandLine,
       pid,
       launchedAt: this.clock.nowIso(),
@@ -577,6 +770,20 @@ export class TunnelManager {
     const previous = this.sessions.get(id);
     if (previous !== undefined) this.terminal.close(previous.pid);
     this.sessions.set(id, session);
+    // Claim the row now; the next poll confirms it through the socket and moves
+    // it to running (or stopped, when the window died on a bad port).
+    const state = this.states.get(id);
+    if (state !== undefined) {
+      this.states.set(id, {
+        ...state,
+        status: "starting",
+        origin: "terminal",
+        pid: undefined,
+        startedAt: session.launchedAt,
+        forwards: [],
+        lastError: undefined,
+      });
+    }
     return session;
   }
 
@@ -617,6 +824,10 @@ export class TunnelManager {
     const session = this.sessions.get(id);
     if (session === undefined) return false;
     this.terminal?.close(session.pid);
+    const profile = this.profiles.get(id);
+    if (this.control !== undefined && profile !== undefined) {
+      void this.control.exit(this.controlPathFor(id), sshDestination(profile));
+    }
     this.sessions.delete(id);
     return true;
   }

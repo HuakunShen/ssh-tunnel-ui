@@ -65,6 +65,20 @@ export interface TerminalPort {
 }
 
 /**
+ * OpenSSH control-socket operations, for tunnels this daemon does not own.
+ *
+ * A tunnel opened in the user's own terminal cannot be signalled by pid; the
+ * control socket is the only honest handle on it. Both calls answer `false`
+ * rather than throwing, because "the socket is gone" is an ordinary state.
+ */
+export interface ControlPort {
+  /** True while the master behind `socketPath` is running. */
+  check(socketPath: string, destination: string): Promise<boolean>;
+  /** Ask the master to exit; true when OpenSSH accepted the request. */
+  exit(socketPath: string, destination: string): Promise<boolean>;
+}
+
+/**
  * Opening a URL in the user's own default handler.
  *
  * A webview cannot do this with a plain anchor: clicking one navigates the

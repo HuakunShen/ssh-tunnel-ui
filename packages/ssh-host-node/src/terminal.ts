@@ -29,6 +29,7 @@ import {
 } from "node:fs";
 import { join } from "node:path";
 import { homedir, platform, tmpdir } from "node:os";
+import type { LaunchMode } from "@ssh-tunnel/contract";
 import type { TerminalPort, TerminalTargetInfo } from "./ports.js";
 
 /** A terminal the daemon knows how to launch with a single command. */
@@ -300,6 +301,8 @@ export function detectTerminals(
 export interface ExternalSession {
   readonly profileId: string;
   readonly terminalId: string;
+  /** `tunnel` runs `ssh -N`; `shell` leaves the session at a prompt. */
+  readonly mode: LaunchMode;
   /** Keyed as `command` so it matches the wire contract directly. */
   readonly command: string;
   readonly pid: number;
