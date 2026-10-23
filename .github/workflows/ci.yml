@@ -1,0 +1,49 @@
+# CI: typecheck, boundary check and the portable test suite.
+#
+# The TUI render snapshots are excluded here: OpenTUI's renderer needs a native
+# FFI that is not available under this vitest setup (it fails the same way
+# locally under node and bun). Everything else in `pnpm test` runs.
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Typecheck every package
+        run: pnpm check
+
+      - name: Package boundaries
+        run: pnpm check:boundaries
+
+      - name: Tests
+        run: pnpm test:ci
+
+      - name: Build the daemon, CLI, TUI and Web UI
+        run: pnpm build

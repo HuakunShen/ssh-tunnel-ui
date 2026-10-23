@@ -16,7 +16,8 @@
     "test:e2e": "vitest run --config vitest.e2e.config.ts",
     "serve": "node apps/server/dist/server.mjs",
     "tui": "node apps/tui/dist/tui.mjs",
-    "format": "prettier --write \"**/*.{ts,tsx,md,json,yaml}\""
+    "format": "prettier --write \"**/*.{ts,tsx,md,json,yaml}\"",
+    "test:ci": "vitest run --exclude 'apps/tui/**'"
   },
   "devDependencies": {
     "@microsoft/tui-test": "catalog:",

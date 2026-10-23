@@ -1,6 +1,19 @@
 # ssh-tunnel-ui
 
+[![ci](https://github.com/HuakunShen/ssh-tunnel-ui/actions/workflows/ci.yml/badge.svg)](https://github.com/HuakunShen/ssh-tunnel-ui/actions/workflows/ci.yml)
+[![release](https://github.com/HuakunShen/ssh-tunnel-ui/actions/workflows/release.yml/badge.svg)](https://github.com/HuakunShen/ssh-tunnel-ui/actions/workflows/release.yml)
+
 A one-click SSH tunnel manager: remember every tunnel, start/stop with a keypress.
+
+## Install
+
+Download `SSH-Tunnel-macos-arm64.dmg` from
+[Releases](https://github.com/HuakunShen/ssh-tunnel-ui/releases) and drag the app
+to Applications. The build is ad-hoc signed, not notarized, so the first launch
+needs right-click > Open (or `xattr -dr com.apple.quarantine "/Applications/SSH Tunnel.app"`).
+
+The app carries its own daemon, the Web UI and the icon: once copied it runs
+without this repository next to it.
 
 ## Gallery
 
@@ -84,9 +97,10 @@ failure.
 
 ```sh
 pnpm install
-pnpm check        # tsc --noEmit everywhere (12 packages)
+pnpm check        # tsc --noEmit everywhere (16 workspace members)
 pnpm check:boundaries
-pnpm test         # vitest: 47 tests (core argv/validate/machine + HTTP API)
+pnpm test         # vitest, every suite
+pnpm test:ci      # the same minus the TUI render snapshots (see below)
 pnpm build        # esbuild bundles for server/cli/tui + static web dist
 
 # daemon + web UI
@@ -97,6 +111,20 @@ node apps/tui/dist/tui.mjs
 # CLI (daemon mode default, `--direct` embeds the manager)
 node apps/cli/dist/cli.mjs list
 ```
+
+`pnpm test` also runs the TUI snapshot tests, which need OpenTUI's native
+renderer. That FFI is unavailable under this vitest setup, so those four
+assertions fail locally and in CI; `pnpm test:ci` (what CI runs) excludes
+`apps/tui/**` and everything else passes.
+
+## Releases
+
+`git tag v0.1.0 && git push origin v0.1.0` builds the daemon, the Web UI and the
+Tauri shell on a macOS runner, then attaches a `.dmg` and a `.zip` to a GitHub
+Release. A manual run of the workflow builds the same artifacts without
+publishing them. Signing and notarization turn on by adding `APPLE_CERTIFICATE`,
+`APPLE_CERTIFICATE_PASSWORD`, `APPLE_SIGNING_IDENTITY`, `APPLE_ID`,
+`APPLE_PASSWORD` and `APPLE_TEAM_ID` as repository secrets.
 
 ## Status (verified live 2026-10-11)
 

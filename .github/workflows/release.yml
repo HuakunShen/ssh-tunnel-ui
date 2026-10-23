@@ -1,0 +1,95 @@
+# Release: build the macOS app and publish it on a tag.
+#
+# `v0.1.0` -> a GitHub Release with the .dmg and a .zip of the .app. A manual
+# run without a tag builds the same artifacts and leaves them as workflow
+# artifacts, so the build can be exercised without publishing anything.
+#
+# The bundle is ad-hoc signed only (no Developer ID here), so a downloaded copy
+# carries the quarantine flag: right-click > Open the first time, or strip it
+# with `xattr -dr com.apple.quarantine`. Adding APPLE_CERTIFICATE,
+# APPLE_CERTIFICATE_PASSWORD, APPLE_SIGNING_IDENTITY and the notarization
+# secrets below would make the download open normally.
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  macos:
+    runs-on: macos-latest
+    env:
+      # Tauri picks these up when present; empty means ad-hoc / unsigned.
+      APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+      APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+      APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/desktop/src-tauri
+
+      - run: pnpm install --frozen-lockfile
+
+      # The shell bundles the daemon and the Web UI as resources, so both must
+      # exist before `tauri build` copies them in.
+      - name: Build the daemon, CLI, TUI and Web UI
+        run: pnpm build
+
+      - name: Build the app and its disk image
+        run: pnpm run build:app -- --target aarch64-apple-darwin --bundles app,dmg
+        working-directory: apps/desktop
+
+      - name: Archive the .app
+        run: |
+          cd apps/desktop/src-tauri/target/aarch64-apple-darwin/release/bundle/macos
+          ditto -c -k --sequesterRsrc --keepParent "SSH Tunnel.app" \
+            "$GITHUB_WORKSPACE/SSH-Tunnel-macos-arm64.zip"
+
+      - name: Collect the disk image
+        run: |
+          cp apps/desktop/src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg \
+            "$GITHUB_WORKSPACE/SSH-Tunnel-macos-arm64.dmg"
+
+      - name: Publish the release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            SSH-Tunnel-macos-arm64.dmg
+            SSH-Tunnel-macos-arm64.zip
+          generate_release_notes: true
+
+      - name: Keep the artifacts of a manual run
+        if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: SSH-Tunnel-macos-arm64
+          path: |
+            SSH-Tunnel-macos-arm64.dmg
+            SSH-Tunnel-macos-arm64.zip

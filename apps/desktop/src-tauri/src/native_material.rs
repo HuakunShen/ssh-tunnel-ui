@@ -10,7 +10,21 @@
 /// host installed a material.
 const BOOTSTRAP: &str = include_str!("native_material.js");
 
+use std::sync::OnceLock;
+use tauri::webview::PageLoadEvent;
 use tauri::WebviewWindowBuilder;
+
+/// The material this shell actually installed, published to every new page.
+///
+/// A webview reload starts a fresh document that never runs the startup
+/// script, so without this the page would fall back to its opaque palette on
+/// the first reload (and `tauri dev` reloads constantly) while a material is
+/// still sitting behind it.
+static INSTALLED: OnceLock<&'static str> = OnceLock::new();
+
+fn installed() -> &'static str {
+    INSTALLED.get().copied().unwrap_or("none")
+}
 
 pub fn create_main_window(app: &mut tauri::App) -> tauri::Result<()> {
     let config = app
@@ -26,6 +40,11 @@ pub fn create_main_window(app: &mut tauri::App) -> tauri::Result<()> {
     // material and the drag-region script are in place before the first paint.
     let window = WebviewWindowBuilder::from_config(app, config)?
         .initialization_script(BOOTSTRAP)
+        .on_page_load(|window, payload| {
+            if payload.event() == PageLoadEvent::Finished {
+                publish(&window, installed());
+            }
+        })
         .build()?;
     #[cfg(target_os = "macos")]
     macos::install(&window);
@@ -116,6 +135,7 @@ mod macos {
             ns_window.setTitlebarAppearsTransparent(true);
 
             let backdrop = installed_backdrop(&ns_window);
+            let _ = super::INSTALLED.set(backdrop);
             // `eval` has to reach a webview that is already running; calling it
             // here, during setup, deadlocks. Hand the answer to the next tick.
             let pending = owner.clone();
@@ -161,6 +181,8 @@ mod windows {
             return;
         };
         let installed = apply_mica(hwnd, None).is_ok() || apply_acrylic(hwnd, None).is_ok();
-        super::publish(window, if installed { "vibrancy" } else { "none" });
+        let backdrop = if installed { "vibrancy" } else { "none" };
+        let _ = INSTALLED.set(backdrop);
+        super::publish(window, backdrop);
     }
 }
