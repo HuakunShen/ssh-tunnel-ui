@@ -181,7 +181,10 @@ export function createServiceApp(context: ServiceContext): Hono {
       if (!parsed.success) {
         throw new TunnelError("InvalidRequest", "launch needs a terminalId");
       }
-      const session = context.manager.launchInTerminal(c.req.param("id"), parsed.data.terminalId);
+      const session = await context.manager.launchInTerminal(
+        c.req.param("id"),
+        parsed.data.terminalId,
+      );
       const checked = launchResponseSchema.safeParse(session);
       if (!checked.success) {
         return toResponse(new TunnelError("InternalError", "launch shape drifted"));

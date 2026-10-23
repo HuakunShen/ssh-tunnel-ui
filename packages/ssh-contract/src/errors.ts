@@ -26,6 +26,8 @@ export const TUNNEL_PROBLEM_CODES = [
   "ProbeFailed",
   /** The JSON store could not be read or written. */
   "StoreFailed",
+  /** A terminal app refused the launch; its own stderr is in the message. */
+  "TerminalFailed",
   /** The operation is not supported by this build/platform. */
   "UnsupportedOperation",
   /** A deadline elapsed; the outcome is unknown, never silently retried. */
@@ -48,6 +50,7 @@ export const TUNNEL_STATUS_BY_CODE: Record<TunnelProblemCode, number> = {
   PortInUse: 409,
   ProbeFailed: 502,
   StoreFailed: 500,
+  TerminalFailed: 502,
   UnsupportedOperation: 400,
   Timeout: 504,
   InternalError: 500,

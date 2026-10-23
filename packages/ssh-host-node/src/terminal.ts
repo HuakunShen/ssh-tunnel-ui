@@ -9,11 +9,26 @@
  *
  * Only terminals whose CLI accepts "run this one command" are offered, and
  * discovery is pure filesystem probing — nothing here runs a candidate.
+ *
+ * Launch is where the OS can quietly refuse: AppleScript automation denied,
+ * a bundle that moved, a launcher that is not installed after all. The spawn is
+ * therefore observed for a short settle window, and a launcher that dies with
+ * a non-zero status is reported with its own stderr instead of a pid that
+ * means nothing.
  */
 import { spawn } from "node:child_process";
-import { accessSync, constants, readdirSync, statSync } from "node:fs";
+import {
+  accessSync,
+  closeSync,
+  constants,
+  openSync,
+  readFileSync,
+  readdirSync,
+  statSync,
+  unlinkSync,
+} from "node:fs";
 import { join } from "node:path";
-import { homedir, platform } from "node:os";
+import { homedir, platform, tmpdir } from "node:os";
 import type { TerminalPort, TerminalTargetInfo } from "./ports.js";
 
 /** A terminal the daemon knows how to launch with a single command. */
@@ -292,11 +307,26 @@ export interface ExternalSession {
 }
 
 /**
- * How long a launcher process may live. A CLI terminal exits as soon as the
- * command does; a GUI app's launcher either exits immediately or not at all, so
- * this only ever reaps the latter.
+ * How long a launcher gets to fail.
+ *
+ * `open` and `osascript` finish in milliseconds, and a non-zero exit is a real
+ * error worth reporting (iTerm2 refusing Apple events, a missing binary). A
+ * launcher still alive after this window *is* the terminal — kitty, xterm,
+ * Windows Terminal — and must keep running: it holds the tunnel's window.
  */
-const LAUNCHER_GRACE_MS = 15_000;
+const LAUNCH_SETTLE_MS = 700;
+
+/** How much of a launcher's stderr travels into the error message. */
+const LAUNCH_STDERR_LIMIT = 2_000;
+
+/** Everything the launcher wrote to stderr, already trimmed and bounded. */
+function readLauncherLog(path: string): string {
+  try {
+    return readFileSync(path, "utf8").slice(0, LAUNCH_STDERR_LIMIT).trim();
+  } catch {
+    return "";
+  }
+}
 
 export function createTerminalPort(
   hostPlatform: NodeJS.Platform = platform(),
@@ -321,32 +351,58 @@ export function createTerminalPort(
       }));
     },
 
-    launch(terminalId: string, commandLine: string): number {
+    async launch(terminalId: string, commandLine: string): Promise<number> {
       const target = find(terminalId);
+      // stderr goes to a file rather than a pipe: the pipe would keep the
+      // daemon's event loop referenced for as long as the terminal lives, and
+      // we only ever read it back when the launcher died.
+      const logPath = join(
+        tmpdir(),
+        `ssh-tunnel-launch-${process.pid}-${Date.now()}.log`,
+      );
+      let logFd: number | "ignore" = "ignore";
+      try {
+        logFd = openSync(logPath, "a");
+      } catch {
+        logFd = "ignore";
+      }
       const child = spawn(target.command, [...target.argvFor(commandLine)], {
         detached: true,
-        stdio: "ignore",
+        stdio: ["ignore", "ignore", logFd],
       });
-      child.on("error", () => {
-        // The launcher exited immediately (app missing, PATH wrong). Nothing to
-        // clean up: the tunnel runs inside the terminal, not under this pid.
+      if (typeof logFd === "number") closeSync(logFd);
+
+      const outcome = await new Promise<
+        { readonly kind: "alive" } | { readonly kind: "exit"; readonly code: number | null }
+      >((resolve) => {
+        const settle = setTimeout(() => resolve({ kind: "alive" }), LAUNCH_SETTLE_MS);
+        child.once("error", () => {
+          clearTimeout(settle);
+          resolve({ kind: "exit", code: 127 });
+        });
+        child.once("exit", (code) => {
+          clearTimeout(settle);
+          resolve({ kind: "exit", code });
+        });
       });
-      child.unref();
-      const pid = child.pid;
-      // A GUI app may never exit its launcher (Terminal.app stays running once
-      // open, and an AppleScript call can block on a consent dialog). Give the
-      // launcher a bounded life so it never accumulates as a daemon zombie.
-      if (pid !== undefined) {
-        const reaper = setTimeout(() => {
-          try {
-            process.kill(pid, "SIGTERM");
-          } catch {
-            // Already exited.
-          }
-        }, LAUNCHER_GRACE_MS);
-        reaper.unref();
+
+      const detail = outcome.kind === "exit" ? readLauncherLog(logPath) : "";
+      try {
+        unlinkSync(logPath);
+      } catch {
+        // The terminal may still hold it open (Windows); a temp file is cheap.
       }
-      return pid ?? -1;
+
+      if (outcome.kind === "exit" && outcome.code !== 0) {
+        const reason =
+          detail.length > 0
+            ? detail.split("\n").slice(-3).join(" ")
+            : `exit ${outcome.code ?? "unknown"}`;
+        throw new Error(`${target.label} refused the launch: ${reason}`);
+      }
+
+      child.unref();
+      return child.pid ?? -1;
     },
 
     close(pid: number): void {

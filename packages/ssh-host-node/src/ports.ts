@@ -50,8 +50,16 @@ export interface TerminalTargetInfo {
 export interface TerminalPort {
   /** Terminals actually installed on this machine. */
   detect(): readonly TerminalTargetInfo[];
-  /** Launch `commandLine` inside `terminalId`; returns the spawned pid. */
-  launch(terminalId: string, commandLine: string): number;
+  /**
+   * Launch `commandLine` inside `terminalId`; resolves to the spawned pid.
+   *
+   * Rejects when the launcher itself failed — a missing binary, or a terminal
+   * that refused the call (iTerm2 denying Apple events, for instance). The
+   * promise deliberately waits a short settle window, because a launcher that
+   * dies instantly is the only observable failure: after that the tunnel lives
+   * in the terminal's own process tree, not ours.
+   */
+  launch(terminalId: string, commandLine: string): Promise<number>;
   /** End a previously launched terminal session. */
   close(pid: number): void;
 }

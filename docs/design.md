@@ -64,7 +64,7 @@ listeners don't false-degrade.
 
 ## Error model
 
-Closed `TUNNEL_PROBLEM_CODES` (13) + `TunnelError(code)`; clients branch on
+Closed `TUNNEL_PROBLEM_CODES` (14) + `TunnelError(code)`; clients branch on
 `code`, never message. `details` are flat redacted facts (ports, exit codes).
 
 ## Fronts share one contract

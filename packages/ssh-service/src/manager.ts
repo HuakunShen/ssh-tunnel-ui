@@ -523,8 +523,12 @@ export class TunnelManager {
    * that window, so the pid is ours to close — but the tunnel's health stays
    * defined by port probes, so a user-closed window is reported as stopped,
    * never as a failure.
+   *
+   * A launcher that refuses the call (iTerm2 denying automation, a terminal
+   * bundle that moved) surfaces as `TerminalFailed` with the launcher's own
+   * stderr, rather than a success toast naming a pid nobody can see.
    */
-  launchInTerminal(id: string, terminalId: string): ExternalSession {
+  async launchInTerminal(id: string, terminalId: string): Promise<ExternalSession> {
     if (this.terminal === undefined) {
       throw new TunnelError(
         "UnsupportedOperation",
@@ -547,18 +551,18 @@ export class TunnelManager {
     const commandLine = buildSshArgv(profile).command;
     let pid: number;
     try {
-      pid = this.terminal.launch(terminalId, commandLine);
+      pid = await this.terminal.launch(terminalId, commandLine);
     } catch (e) {
       throw new TunnelError(
-        "UnsupportedOperation",
+        "TerminalFailed",
         e instanceof Error ? e.message : "terminal launch failed",
         { details: { profileId: id, terminalId } },
       );
     }
     if (pid <= 0) {
       throw new TunnelError(
-        "SshFailed",
-        "terminal launcher exited immediately",
+        "TerminalFailed",
+        "the terminal launcher reported no process",
         { details: { profileId: id, terminalId } },
       );
     }

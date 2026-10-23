@@ -161,7 +161,7 @@ describe("daemon API", () => {
           { id: "terminal", label: "Terminal", hint: "com.apple.Terminal", platform: "darwin" },
           { id: "warp", label: "Warp", hint: "dev.warp.Warp-Stable", platform: "darwin" },
         ],
-        launch(terminalId, commandLine): number {
+        async launch(terminalId, commandLine): Promise<number> {
           launched.push({ terminalId, commandLine });
           return nextPid++;
         },
@@ -206,6 +206,43 @@ describe("daemon API", () => {
       const closedSession = await app.request(`/api/profiles/${id}/session`, { method: "DELETE" });
       expect(closedSession.status).toBe(200);
       expect(closed).toEqual([body.pid]);
+    });
+
+    it("reports a launcher that refuses the call as TerminalFailed (502)", async () => {
+      const ports = fakePorts();
+      const refusing: TerminalPort = {
+        detect: () => [
+          { id: "iterm2", label: "iTerm2", hint: "com.googlecode.iterm2", platform: "darwin" },
+        ],
+        async launch(): Promise<number> {
+          throw new Error(
+            "iTerm2 refused the launch: execution error: iTerm got an error: A privilege violation occurred. (-10004)",
+          );
+        },
+        close(): void {
+          // Nothing was spawned, so there is nothing to end.
+        },
+      };
+      const manager = new TunnelManager({
+        process: ports.process,
+        probe: ports.probe,
+        store: ports.store,
+        clock: systemClock,
+        logDir: "/tmp/ssh-tunnel-test-logs",
+        terminal: refusing,
+      });
+      const refusingApp = createServiceApp({ manager, serviceInstanceId: "test-refusing" });
+      const created = await post(refusingApp, "/api/profiles", INPUT);
+      const id = (created.json as { id: string }).id;
+
+      const result = await post(refusingApp, `/api/profiles/${id}/launch`, {
+        terminalId: "iterm2",
+      });
+      expect(result.status).toBe(502);
+      const problem = (result.json as { problem: { code: string; message: string } }).problem;
+      expect(problem.code).toBe("TerminalFailed");
+      // The launcher's own words are what tell the user to grant Automation.
+      expect(problem.message).toContain("-10004");
     });
 
     it("rejects an uninstalled terminal with NotFound (404)", async () => {
