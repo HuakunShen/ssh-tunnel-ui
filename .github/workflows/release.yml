@@ -22,14 +22,6 @@ permissions:
 jobs:
   macos:
     runs-on: macos-latest
-    env:
-      # Tauri picks these up when present; empty means ad-hoc / unsigned.
-      APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-      APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-      APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-      APPLE_ID: ${{ secrets.APPLE_ID }}
-      APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -61,9 +53,17 @@ jobs:
       - name: Build the daemon, CLI, TUI and Web UI
         run: pnpm build
 
+      # Unsigned (ad-hoc) build. To sign and notarize, declare the secrets and
+      # put these back on the step below: Tauri imports the certificate when the
+      # variables exist, and an *empty* APPLE_CERTIFICATE makes it try (and
+      # fail) to import nothing, so they must stay absent until real values are
+      # configured.
+      #   APPLE_CERTIFICATE, APPLE_CERTIFICATE_PASSWORD, APPLE_SIGNING_IDENTITY,
+      #   APPLE_ID, APPLE_PASSWORD, APPLE_TEAM_ID
+      #
+      # `pnpm run <script> -- ...` would hand the `--` to tauri, which then
+      # forwards `--bundles` to cargo. Call the CLI directly instead.
       - name: Build the app and its disk image
-        # `pnpm run <script> -- ...` would hand the `--` to tauri, which then
-        # forwards `--bundles` to cargo. Call the CLI directly instead.
         run: pnpm exec tauri build --bundles app,dmg
         working-directory: apps/desktop
 
