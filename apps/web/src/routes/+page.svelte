@@ -103,7 +103,16 @@
   }
 
   async function refresh(): Promise<void> {
+    const wasConnected = store.connected;
     store = await refreshAll(store);
+    // Hosts and terminals are one-shot reads, not part of the poll: re-read
+    // them when the daemon appears. The desktop shell loads the page before
+    // the sidecar answers, so without this the sidebar stays empty until the
+    // user refreshes by hand.
+    if (!wasConnected && store.connected) {
+      store = await refreshHosts(store);
+      store = await refreshTerminals(store);
+    }
   }
 
   function setBusy(id: string, on: boolean): void {
