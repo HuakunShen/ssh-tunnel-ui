@@ -3,13 +3,45 @@
   "ui": "tui",
   "tasks": {
     "build": {
-      "dependsOn": ["^build"],
-      "inputs": ["$TURBO_DEFAULT$"],
-      "outputs": ["dist/**", "web/**"]
+      "dependsOn": [
+        "^build"
+      ],
+      "inputs": [
+        "$TURBO_DEFAULT$"
+      ],
+      "outputs": [
+        "dist/**",
+        "web/**"
+      ]
     },
     "check": {
-      "dependsOn": ["^check"],
+      "dependsOn": [
+        "^check"
+      ],
       "outputs": []
+    },
+    "dsh-plugin-ssh-tunnel#build": {
+      "dependsOn": [
+        "@ssh-tunnel/web#build"
+      ],
+      "inputs": [
+        "$TURBO_DEFAULT$"
+      ],
+      "outputs": [
+        "dist/**",
+        "web/**"
+      ]
+    },
+    "vscode-ssh-tunnel#build": {
+      "dependsOn": [
+        "@ssh-tunnel/server#build"
+      ],
+      "inputs": [
+        "$TURBO_DEFAULT$"
+      ],
+      "outputs": [
+        "dist/**"
+      ]
     }
   }
 }
