@@ -62,7 +62,9 @@ jobs:
         run: pnpm build
 
       - name: Build the app and its disk image
-        run: pnpm run build:app -- --bundles app,dmg
+        # `pnpm run <script> -- ...` would hand the `--` to tauri, which then
+        # forwards `--bundles` to cargo. Call the CLI directly instead.
+        run: pnpm exec tauri build --bundles app,dmg
         working-directory: apps/desktop
 
       - name: Archive the .app
