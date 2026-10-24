@@ -10,6 +10,7 @@ import {
   createNodeProbePort,
   createNodeProcessPort,
   createControlPort,
+  supportsControlMaster,
   createFileRuntimeStore,
   createFileStorePort,
   createOpenUrlPort,
@@ -65,7 +66,12 @@ export async function startDaemon(options: ServeOptions = {}): Promise<{ port: n
     logDir,
     terminal: createTerminalPort(),
     openUrl: createOpenUrlPort(),
-    control: createControlPort(options.sshPath ?? "ssh"),
+    // OpenSSH multiplexing is POSIX-only: the Windows build of ssh has no
+    // ControlMaster, and handing it the option would fail every managed start.
+    // There the manager owns a tunnel by the pid it spawned instead.
+    ...(supportsControlMaster(process.platform)
+      ? { control: createControlPort(options.sshPath ?? "ssh") }
+      : {}),
     // Next to the profiles: what was up when this daemon last wrote.
     runtime: createFileRuntimeStore(join(dirname(storePath), "runtime.json")),
   });

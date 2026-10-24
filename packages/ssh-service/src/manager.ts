@@ -120,6 +120,14 @@ export class TunnelManager {
   private readonly terminal: TerminalPort | undefined;
   private readonly openUrlPort: OpenUrlPort | undefined;
   private readonly control: ControlPort | undefined;
+  /**
+   * Whether this host can multiplex OpenSSH sessions over a control socket.
+   *
+   * Windows' ssh has no ControlMaster, so a tunnel there is owned by the pid
+   * that spawned it instead — the same fact, taken from a source that exists.
+   * Everything downstream (argv, adoption, stop) branches on this one flag.
+   */
+  private readonly multiplexed: boolean;
   private readonly controlDir: string;
   private readonly runtime: RuntimeStorePort | undefined;
   private readonly sessions = new Map<string, ExternalSession>();
@@ -138,6 +146,7 @@ export class TunnelManager {
     this.terminal = options.terminal;
     this.openUrlPort = options.openUrl;
     this.control = options.control;
+    this.multiplexed = options.control !== undefined;
     this.controlDir = options.controlDir ?? join(homedir(), ".ssh-tunnel-ui", "control");
     this.runtime = options.runtime;
   }
@@ -160,20 +169,21 @@ export class TunnelManager {
   /**
    * Re-claim the tunnels the previous daemon wrote down.
    *
-   * A record is a claim, not proof: the ControlMaster socket has to answer
-   * before it is trusted, because the ssh process may have died while the
-   * daemon was away (a reboot kills it, a crash does not). Entries that fail
-   * the check are dropped from the file on the way out.
+   * A record is a claim, not proof: the ssh process may have died while the
+   * daemon was away (a reboot kills it, a crash does not), so each entry has to
+   * be witnessed by something that still answers — the ControlMaster socket
+   * where the host has one, the recorded pid where it does not. Entries that
+   * fail the check are dropped from the file on the way out.
    */
   private async adoptRuntime(): Promise<void> {
-    if (this.runtime === undefined || this.control === undefined) return;
+    if (this.runtime === undefined) return;
     const records = await this.runtime.read();
     if (records.length === 0) return;
     const keep: RuntimeRecord[] = [];
     for (const record of records) {
       const profile = this.profiles.get(record.profileId);
       if (profile === undefined) continue;
-      if (!(await this.socketAlive(record.profileId, profile))) continue;
+      if (!(await this.runtimeAlive(record))) continue;
       keep.push(record);
       this.states.set(record.profileId, {
         profileId: record.profileId,
@@ -393,6 +403,38 @@ export class TunnelManager {
   }
 
   /**
+   * ssh options for a command line the daemon builds (managed start, terminal
+   * handoff).
+   *
+   * The control socket is added only where the host supports multiplexing, so
+   * one profile produces a working command on every platform instead of a
+   * macOS-only incantation the Windows build of ssh would reject.
+   */
+  private handoffOptions(
+    id: string,
+    interactive = false,
+  ): { readonly controlPath?: string; readonly interactive: boolean } {
+    return this.multiplexed
+      ? { controlPath: this.controlPathFor(id), interactive }
+      : { interactive };
+  }
+
+  /**
+   * Is a runtime record still real?
+   *
+   * The control socket is preferred where it exists because it names the exact
+   * session. Without one, only a tunnel this daemon started may be adopted by
+   * pid — a terminal-opened tunnel has no handle we could ever stop.
+   */
+  private async runtimeAlive(record: RuntimeRecord): Promise<boolean> {
+    const profile = this.profiles.get(record.profileId);
+    if (profile === undefined) return false;
+    if (await this.socketAlive(record.profileId, profile)) return true;
+    if (this.multiplexed) return false;
+    return record.origin === "managed" && record.pid !== undefined && this.process.isAlive(record.pid);
+  }
+
+  /**
    * Is a master behind this profile's control socket answering?
    *
    * The file is checked first: with no socket there is nothing to ask, and a
@@ -481,9 +523,17 @@ export class TunnelManager {
       // A managed child of ours is authoritative while it lives.
       const live = this.live.get(id);
       if (live !== undefined && this.process.isAlive(live.child.pid)) continue;
-      // Adopted after a restart: the socket is the only witness left.
+      // Adopted after a restart: the socket is the strongest witness left,
+      // and where there is none the pid we recorded is.
       if (state.origin === "managed") {
         if (await this.socketAlive(id, profile)) continue;
+        if (
+          !this.multiplexed &&
+          state.pid !== undefined &&
+          this.process.isAlive(state.pid)
+        ) {
+          continue;
+        }
         this.states.set(id, {
           ...state,
           status: "stopped",
@@ -546,13 +596,17 @@ export class TunnelManager {
     this.setStatus(id, "starting", { lastError: undefined });
 
     // The same ControlMaster socket the terminal handoff uses: it is how a
-    // later daemon (after a restart) recognises this tunnel as its own.
-    try {
-      mkdirSync(this.controlDir, { recursive: true, mode: 0o700 });
-    } catch {
-      // A missing directory shows up as an ssh failure with its own message.
+    // later daemon (after a restart) recognises this tunnel as its own. A host
+    // without multiplexing omits it entirely — its ssh would refuse the option
+    // and the tunnel would never start.
+    if (this.multiplexed) {
+      try {
+        mkdirSync(this.controlDir, { recursive: true, mode: 0o700 });
+      } catch {
+        // A missing directory shows up as an ssh failure with its own message.
+      }
     }
-    const { argv } = buildSshArgv(profile, { controlPath: this.controlPathFor(id) });
+    const { argv } = buildSshArgv(profile, this.handoffOptions(id));
     try {
       mkdirSync(this.logDir, { recursive: true });
     } catch {
@@ -695,6 +749,16 @@ export class TunnelManager {
         await new Promise((resolve) => setTimeout(resolve, 400));
       }
       this.live.delete(id);
+    } else if (
+      !this.multiplexed &&
+      refreshed.origin === "managed" &&
+      refreshed.pid !== undefined &&
+      this.process.isAlive(refreshed.pid)
+    ) {
+      // Adopted by pid after a restart: there is no child handle and no socket,
+      // so the recorded pid is the only way to end it.
+      this.process.killTree(refreshed.pid);
+      await new Promise((resolve) => setTimeout(resolve, 1200));
     }
     this.setStatus(id, "stopped", { pid: undefined, startedAt: undefined });
     await this.persistRuntime();
@@ -861,10 +925,12 @@ export class TunnelManager {
    * bundle that moved) surfaces as `TerminalFailed` with the launcher's own
    * stderr, rather than a success toast naming a pid nobody can see.
    *
-   * The command carries a per-profile ControlMaster socket, so the session this
-   * window owns stays checkable (`ssh -O check`) and stoppable (`ssh -O exit`)
-   * even though the daemon never holds its pid. `shell` drops `-N`: the window
-   * is then a real interactive session, and the forwards live and die with it.
+   * Where the host supports multiplexing the command carries a per-profile
+   * ControlMaster socket, so the session this window owns stays checkable
+   * (`ssh -O check`) and stoppable (`ssh -O exit`) even though the daemon never
+   * holds its pid; elsewhere the launcher pid is the only handle. `shell` drops
+   * `-N`: the window is then a real interactive session, and the forwards live
+   * and die with it.
    */
   async launchInTerminal(
     id: string,
@@ -890,15 +956,17 @@ export class TunnelManager {
         details: { profileId: id, terminalId },
       });
     }
-    try {
-      mkdirSync(this.controlDir, { recursive: true, mode: 0o700 });
-    } catch {
-      // A missing directory surfaces as a failed ssh below, with its own words.
+    if (this.multiplexed) {
+      try {
+        mkdirSync(this.controlDir, { recursive: true, mode: 0o700 });
+      } catch {
+        // A missing directory surfaces as a failed ssh below, with its own words.
+      }
     }
-    const commandLine = buildSshArgv(profile, {
-      controlPath: this.controlPathFor(id),
-      interactive: mode === "shell",
-    }).command;
+    const commandLine = buildSshArgv(
+      profile,
+      this.handoffOptions(id, mode === "shell"),
+    ).command;
     let pid: number;
     try {
       pid = await this.terminal.launch(terminalId, commandLine);
