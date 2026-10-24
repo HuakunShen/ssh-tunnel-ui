@@ -35,6 +35,7 @@
     "targets": [
       "app"
     ],
+    "createUpdaterArtifacts": true,
     "category": "Utility",
     "shortDescription": "One-click SSH tunnel manager.",
     "icon": [
