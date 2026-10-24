@@ -122,3 +122,76 @@ jobs:
         working-directory: apps/desktop/src-tauri
         run: cargo test
 
+
+  # Compiling the shell proves it builds; this proves it *starts*. The real
+  # desktop binary is launched against the real bundled daemon and Web UI, and
+  # the daemon it spawns has to answer — the path a user's double-click takes.
+  # Linux needs a virtual display; Windows runners already have WebView2.
+  desktop-run:
+    name: launch — ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Linux WebView prerequisites
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf xvfb
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/desktop/src-tauri
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Build the daemon and Web UI the shell bundles
+        run: pnpm build
+
+      - name: Build the shell
+        working-directory: apps/desktop/src-tauri
+        run: cargo build
+
+      - name: Launch the desktop app and wait for its daemon
+        shell: bash
+        run: |
+          export HOME="$RUNNER_TEMP/desktop-home" USERPROFILE="$RUNNER_TEMP/desktop-home"
+          mkdir -p "$HOME"
+          cd apps/desktop/src-tauri
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            ./target/debug/ssh-tunnel-desktop.exe &
+          else
+            xvfb-run -a ./target/debug/ssh-tunnel-desktop &
+          fi
+          ok=0
+          for i in $(seq 1 60); do
+            if curl -fs http://127.0.0.1:7432/api/health; then ok=1; break; fi
+            sleep 1
+          done
+          [ "$ok" = 1 ] || { echo "the desktop app never started its daemon"; exit 1; }
+          curl -fs http://127.0.0.1:7432/ | grep -qi "<html"
+          # The shell must still be alive, not a daemon left by a crashed window.
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            tasklist | grep -i ssh-tunnel-desktop
+          else
+            pgrep -f target/debug/ssh-tunnel-desktop
+          fi
