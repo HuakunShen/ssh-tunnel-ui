@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Merged into the bundle's Info.plist by Tauri.
+
+  macOS treats "connect to a host on my LAN" as a protected resource. Without a
+  usage description the system has nothing to show when the daemon first dials
+  192.168.x.x, so the connection is refused (EHOSTUNREACH) and a tunnel manager
+  looks broken on exactly the networks it is for. The string is what the
+  privacy prompt displays.
+-->
+<plist version="1.0">
+  <dict>
+    <key>NSLocalNetworkUsageDescription</key>
+    <string>SSH Tunnel connects to the SSH hosts on your local network that your tunnels point at.</string>
+  </dict>
+</plist>
