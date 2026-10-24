@@ -19,6 +19,7 @@
   import LogSheet from "$lib/LogSheet.svelte";
   import SettingsSheet from "$lib/SettingsSheet.svelte";
   import TunnelEditor from "$lib/TunnelEditor.svelte";
+  import type { TunnelStatus } from "@ssh-tunnel/contract";
   import {
     getClient,
     initialStore,
@@ -126,9 +127,29 @@
     busyIds = next;
   }
 
-  async function act(id: string, label: string, fn: () => Promise<unknown>): Promise<void> {
+  /**
+   * Run one row action with immediate feedback. The backend blocks (the ssh
+   * grace window on start, the kill grace on stop), so the row is patched to
+   * `optimistic` up front — otherwise the button just sits disabled for
+   * seconds and the action reads as frozen. The poll and the final refresh
+   * overwrite it with the truth either way.
+   */
+  async function act(
+    id: string,
+    label: string,
+    fn: () => Promise<unknown>,
+    optimistic?: TunnelStatus,
+  ): Promise<void> {
     if (busyIds.has(id)) return;
     setBusy(id, true);
+    if (optimistic !== undefined) {
+      store = {
+        ...store,
+        states: store.states.map((s) =>
+          s.profileId === id ? { ...s, status: optimistic } : s,
+        ),
+      };
+    }
     try {
       await fn();
       say(label);
@@ -353,8 +374,8 @@
               tunnelState={store.states.find((s) => s.profileId === profile.id)}
               busy={busyIds.has(profile.id)}
               terminals={store.terminals}
-              onStart={(id) => act(id, "started", () => getClient().start(id))}
-              onStop={(id) => act(id, "stopped", () => getClient().stop(id))}
+              onStart={(id) => act(id, "started", () => getClient().start(id), "starting")}
+              onStop={(id) => act(id, "stopped", () => getClient().stop(id), "stopping")}
               onProbe={(id) => act(id, "probed", () => getClient().probe(id))}
               onCopy={(id) => void copyCommand(id)}
               onLaunch={launch}

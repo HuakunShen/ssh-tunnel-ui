@@ -12,6 +12,7 @@
     ExternalLink,
     FlaskConical,
     Link,
+    LoaderCircle,
     Pencil,
     Play,
     ScrollText,
@@ -210,12 +211,12 @@
 
   <div class="row-actions shrink-0">
     {#if live}
-      <button class="toolbar-button" disabled={busy} onclick={() => onStop(profile.id)} title="Stop tunnel">
-        <CircleStop size={13} /> Stop
+      <button class="toolbar-button" disabled={busy} aria-busy={busy} onclick={() => onStop(profile.id)} title="Stop tunnel">
+        {#if busy}<LoaderCircle size={13} class="animate-spin" />{:else}<CircleStop size={13} />{/if} Stop
       </button>
     {:else}
-      <button class="toolbar-button" disabled={busy} onclick={() => onStart(profile.id)} title="Start tunnel">
-        <Play size={13} /> Start
+      <button class="toolbar-button" disabled={busy} aria-busy={busy} onclick={() => onStart(profile.id)} title="Start tunnel">
+        {#if busy}<LoaderCircle size={13} class="animate-spin" />{:else}<Play size={13} />{/if} Start
       </button>
     {/if}
 
