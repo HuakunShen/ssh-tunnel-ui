@@ -2,10 +2,10 @@
 # bundles on one GitHub Release.
 #
 # `v0.1.3` -> one Release carrying
-#   SSH-Tunnel-0.1.3-macos-arm64.dmg / .zip
-#   SSH-Tunnel-0.1.3-macos-x64.dmg / .zip
-#   SSH-Tunnel-0.1.3-linux-x64.deb / .AppImage
-#   SSH-Tunnel-0.1.3-windows-x64-setup.exe
+#   TunnelDeck-0.1.3-macos-arm64.dmg / .zip
+#   TunnelDeck-0.1.3-macos-x64.dmg / .zip
+#   TunnelDeck-0.1.3-linux-x64.deb / .AppImage
+#   TunnelDeck-0.1.3-windows-x64-setup.exe
 # A manual run without a tag builds the same artifacts and keeps them as
 # workflow artifacts instead of publishing anything.
 #
@@ -134,13 +134,13 @@ jobs:
         shell: bash
         run: |
           cd "apps/desktop/src-tauri/target/${{ matrix.target }}/release/bundle/macos"
-          ditto -c -k --sequesterRsrc --keepParent "SSH Tunnel.app" \
-            "$GITHUB_WORKSPACE/dist/SSH-Tunnel-${APP_VERSION}-${{ matrix.label }}.zip"
+          ditto -c -k --sequesterRsrc --keepParent "TunnelDeck.app" \
+            "$GITHUB_WORKSPACE/dist/TunnelDeck-${APP_VERSION}-${{ matrix.label }}.zip"
 
       - name: Keep this platform's artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: SSH-Tunnel-${{ matrix.label }}
+          name: TunnelDeck-${{ matrix.label }}
           path: dist/*
           if-no-files-found: error
 

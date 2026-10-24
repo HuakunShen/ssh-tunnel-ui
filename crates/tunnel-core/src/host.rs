@@ -544,7 +544,7 @@ fn argv_for_terminal(id: &str, cmd: &str) -> Vec<String> {
             "windows-terminal" => vec![
                 "new-tab".into(),
                 "--title".into(),
-                "SSH Tunnel".into(),
+                "TunnelDeck".into(),
                 "cmd.exe".into(),
                 "/c".into(),
                 cmd.into(),

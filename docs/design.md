@@ -1,4 +1,4 @@
-# Design: ssh-tunnel-ui
+# Design: TunnelDeck
 
 ## Goal
 

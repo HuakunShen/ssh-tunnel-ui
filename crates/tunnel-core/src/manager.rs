@@ -108,7 +108,7 @@ fn startup_failure_hint(log_file: &std::path::Path) -> Option<String> {
     Some(
         "hint: this host is on your LAN and the same command works in a terminal, \
          so macOS is likely blocking this app's local-network access. Enable it under \
-         System Settings → Privacy & Security → Local Network → SSH Tunnel, then start again."
+         System Settings → Privacy & Security → Local Network → TunnelDeck, then start again."
             .to_string(),
     )
 }

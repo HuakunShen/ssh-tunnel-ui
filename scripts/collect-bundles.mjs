@@ -4,10 +4,10 @@
  * it is.
  *
  * Tauri names artifacts after the product in the native installer's own style
- * (`SSH Tunnel_0.1.3_aarch64.dmg`, `SSH Tunnel_0.1.3_x64-setup.exe`), which
+ * (`TunnelDeck_0.1.3_aarch64.dmg`, `TunnelDeck_0.1.3_x64-setup.exe`), which
  * leaves a download page where every file has a different shape and nothing
  * names the platform. This copies them to
- * `SSH-Tunnel-<version>-<label><suffix>` so the release assets read as one set.
+ * `TunnelDeck-<version>-<label><suffix>` so the release assets read as one set.
  *
  * Usage: `node scripts/collect-bundles.mjs --label macos-arm64 --version 0.1.3 [--target aarch64-apple-darwin] [--out dist]`
  */
@@ -78,7 +78,7 @@ const copied = [];
 for (const path of walk(bundleRoot)) {
   const suffix = SUFFIX[extname(path).toLowerCase()];
   if (suffix === undefined) continue;
-  const name = `SSH-Tunnel-${version}-${label}${suffix}${extname(path)}`;
+  const name = `TunnelDeck-${version}-${label}${suffix}${extname(path)}`;
   copyFileSync(path, join(outDir, name));
   copied.push(name);
 }

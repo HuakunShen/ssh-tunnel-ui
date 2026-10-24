@@ -1,24 +1,24 @@
-# ssh-tunnel-ui
+# TunnelDeck
 
-[![ci](https://github.com/HuakunShen/ssh-tunnel-ui/actions/workflows/ci.yml/badge.svg)](https://github.com/HuakunShen/ssh-tunnel-ui/actions/workflows/ci.yml)
-[![release](https://github.com/HuakunShen/ssh-tunnel-ui/actions/workflows/release.yml/badge.svg)](https://github.com/HuakunShen/ssh-tunnel-ui/actions/workflows/release.yml)
+[![ci](https://github.com/HuakunShen/tunnel-deck/actions/workflows/ci.yml/badge.svg)](https://github.com/HuakunShen/tunnel-deck/actions/workflows/ci.yml)
+[![release](https://github.com/HuakunShen/tunnel-deck/actions/workflows/release.yml/badge.svg)](https://github.com/HuakunShen/tunnel-deck/actions/workflows/release.yml)
 
 A one-click SSH tunnel manager: remember every tunnel, start/stop with a keypress.
 
 ## Install
 
 Every release ships the same app for four platforms
-([Releases](https://github.com/HuakunShen/ssh-tunnel-ui/releases)):
+([Releases](https://github.com/HuakunShen/tunnel-deck/releases)):
 
 | Platform | Artifact | Notes |
 |---|---|---|
-| macOS, Apple silicon | `SSH-Tunnel-<version>-macos-arm64.dmg` / `.zip` | drag to Applications |
-| macOS, Intel | `SSH-Tunnel-<version>-macos-x64.dmg` / `.zip` | back to macOS 11 |
-| Windows, x64 | `SSH-Tunnel-<version>-windows-x64-setup.exe` | NSIS installer |
-| Linux, x64 | `SSH-Tunnel-<version>-linux-x64.deb` / `.AppImage` | needs WebKitGTK 4.1 |
+| macOS, Apple silicon | `TunnelDeck-<version>-macos-arm64.dmg` / `.zip` | drag to Applications |
+| macOS, Intel | `TunnelDeck-<version>-macos-x64.dmg` / `.zip` | back to macOS 11 |
+| Windows, x64 | `TunnelDeck-<version>-windows-x64-setup.exe` | NSIS installer |
+| Linux, x64 | `TunnelDeck-<version>-linux-x64.deb` / `.AppImage` | needs WebKitGTK 4.1 |
 
 The macOS builds are ad-hoc signed, not notarized, so the first launch needs
-right-click > Open (or `xattr -dr com.apple.quarantine "/Applications/SSH Tunnel.app"`).
+right-click > Open (or `xattr -dr com.apple.quarantine "/Applications/TunnelDeck.app"`).
 The Windows installer is unsigned, so SmartScreen offers "More info" > "Run
 anyway".
 

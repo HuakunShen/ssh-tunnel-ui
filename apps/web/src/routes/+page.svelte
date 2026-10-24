@@ -284,7 +284,7 @@
   -->
   <header class="tunnel-toolbar">
     <div class="toolbar-title" data-tauri-drag-region="deep">
-      <strong>SSH Tunnel</strong>
+      <strong>TunnelDeck</strong>
       <span>one click to apply, one click to stop</span>
     </div>
     <span class="toolbar-spacer" data-tauri-drag-region="deep"></span>
