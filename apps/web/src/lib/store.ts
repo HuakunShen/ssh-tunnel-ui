@@ -35,8 +35,11 @@ declare global {
   }
 }
 
-/** True inside the Tauri shell, where the manager is linked in-process. */
-function runsInTauri(): boolean {
+/**
+ * True inside the Tauri shell, where the manager is linked in-process (and
+ * where the updater bridge exists). A browser tab has neither.
+ */
+export function runsInTauri(): boolean {
   try {
     return window.__TAURI_INTERNALS__?.invoke !== undefined;
   } catch {

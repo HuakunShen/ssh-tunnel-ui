@@ -8,6 +8,7 @@
     "core:window:allow-start-dragging",
     "shell:allow-spawn",
     "dialog:default",
+    "process:default",
     "updater:default"
   ]
 }
