@@ -264,7 +264,11 @@ jobs:
           $ssh = Join-Path $env:USERPROFILE ".ssh"
           New-Item -ItemType Directory -Force $ssh | Out-Null
           $key = Join-Path $ssh "id_e2e"
-          ssh-keygen -q -t ed25519 -N '""' -f $key
+          # Through cmd: PowerShell would hand ssh-keygen a literal `""` as the
+          # passphrase, and BatchMode cannot answer a passphrase prompt.
+          $env:E2E_KEYFILE = $key
+          Set-Content -Encoding ascii (Join-Path $env:RUNNER_TEMP "keygen.cmd") 'ssh-keygen -q -t ed25519 -N "" -f "%E2E_KEYFILE%"'
+          cmd /c (Join-Path $env:RUNNER_TEMP "keygen.cmd")
           # The runner user is an administrator, so sshd reads this file instead
           # of ~/.ssh/authorized_keys, and insists on a locked-down ACL for it.
           $auth = Join-Path $env:ProgramData "ssh\administrators_authorized_keys"
