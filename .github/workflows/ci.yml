@@ -236,9 +236,19 @@ jobs:
           ssh-keygen -q -t ed25519 -N "" -f ~/.ssh/id_e2e
           ssh-keygen -q -t ed25519 -N "" -f "$RUNNER_TEMP/hostkey"
           cat ~/.ssh/id_e2e.pub >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys
-          /usr/sbin/sshd -p 2222 -h "$RUNNER_TEMP/hostkey" -o ListenAddress=127.0.0.1 \
-            -o PidFile="$RUNNER_TEMP/sshd.pid" -o AuthorizedKeysFile="$HOME/.ssh/authorized_keys" \
-            -o StrictModes=no -o UsePAM=no
+          # Its own config file: the default one includes /etc/ssh/sshd_config.d,
+          # which an unprivileged sshd may not read.
+          cat > "$RUNNER_TEMP/sshd_config" <<CONF
+          Port 2222
+          ListenAddress 127.0.0.1
+          HostKey $RUNNER_TEMP/hostkey
+          PidFile $RUNNER_TEMP/sshd.pid
+          AuthorizedKeysFile $HOME/.ssh/authorized_keys
+          PubkeyAuthentication yes
+          StrictModes no
+          UsePAM no
+          CONF
+          /usr/sbin/sshd -f "$RUNNER_TEMP/sshd_config"
           sleep 1
           E2E_SSH_PORT=2222 E2E_SSH_USER="$(id -un)" E2E_SSH_KEY="$HOME/.ssh/id_e2e" \
             node scripts/e2e-tunnel.mjs
