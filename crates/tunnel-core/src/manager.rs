@@ -78,6 +78,41 @@ fn new_id(clock: &dyn ClockPort) -> String {
     format!("t-{time}-{suffix}")
 }
 
+/// Reads the tail of a failed startup log and names the likely cause.
+/// A `No route to host` for a LAN address while the same command works in a
+/// terminal is the Local Network privacy grant, not the network: the grant is
+/// per-app identity, Terminal has it, and an ad-hoc-signed app may not (or
+/// the grant reset on rebuild). Returns `None` when the log says nothing
+/// recognizable, so unrelated failures keep their plain message.
+fn startup_failure_hint(log_file: &std::path::Path) -> Option<String> {
+    let raw = std::fs::read(log_file).ok()?;
+    let tail = &raw[raw.len().saturating_sub(4096)..];
+    let text = String::from_utf8_lossy(tail);
+    if !text.contains("No route to host") {
+        return None;
+    }
+    let lan = text.split_whitespace().any(|word| {
+        let ip = word.trim_matches(|c: char| !c.is_ascii_alphanumeric() && c != '.');
+        ip.starts_with("192.168.")
+            || ip.starts_with("10.")
+            || (ip.starts_with("172.")
+                && ip
+                    .split('.')
+                    .nth(1)
+                    .and_then(|octet| octet.parse::<u8>().ok())
+                    .is_some_and(|octet| (16..=31).contains(&octet)))
+    });
+    if !lan {
+        return None;
+    }
+    Some(
+        "hint: this host is on your LAN and the same command works in a terminal, \
+         so macOS is likely blocking this app's local-network access. Enable it under \
+         System Settings → Privacy & Security → Local Network → SSH Tunnel, then start again."
+            .to_string(),
+    )
+}
+
 fn health_for_probe(
     profile: &TunnelProfile,
     results: &HashMap<u16, (bool, Option<u64>, Option<String>)>,
@@ -795,10 +830,16 @@ where
                 .get(id)
                 .is_some_and(|s| s.status == TunnelStatus::Starting);
             if needs_fail {
+                // Surface the cause, not just the log path: a LAN host that is
+                // unreachable from the app while the same command works in a
+                // terminal is almost always the system's Local Network privacy
+                // grant (per-app identity; Terminal has it, this app may not).
+                let cause = startup_failure_hint(&log_file);
                 self.set_status(id, TunnelStatus::Failed, |s| {
                     s.last_error = Some(format!(
-                        "ssh exited during startup; see {}",
-                        log_file.display()
+                        "ssh exited during startup; see {}{}",
+                        log_file.display(),
+                        cause.map(|hint| format!("\n{hint}")).unwrap_or_default()
                     ));
                 })?;
             }
@@ -1347,5 +1388,34 @@ mod tests {
         bad.name = "  ".into();
         let result = manager.create_profile(bad);
         assert!(matches!(result, Err(e) if e.code == TunnelProblemCode::InvalidRequest));
+    }
+
+    #[test]
+    fn lan_unreachable_names_the_privacy_grant() {
+        let dir = std::env::temp_dir().join(format!("ssh-tunnel-hint-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let log = dir.join("t-1.log");
+        std::fs::write(
+            &log,
+            "ssh: connect to host 192.168.6.250 port 22: No route to host\n",
+        )
+        .unwrap();
+        let hint = super::startup_failure_hint(&log).expect("a LAN failure must hint");
+        assert!(hint.contains("Local Network"), "{hint}");
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn non_lan_failures_keep_the_plain_message() {
+        let dir = std::env::temp_dir().join(format!("ssh-tunnel-nohint-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let log = dir.join("t-1.log");
+        std::fs::write(
+            &log,
+            "ssh: connect to host example.com port 22: Operation timed out\n",
+        )
+        .unwrap();
+        assert!(super::startup_failure_hint(&log).is_none());
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 }
