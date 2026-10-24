@@ -3,9 +3,19 @@
  * (fake ports, no real ssh). Guards the contract every front shares.
  */
 import { beforeEach, describe, expect, it } from "vitest";
+import { mkdirSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { TunnelManager, createServiceApp } from "@ssh-tunnel/service";
 import { systemClock } from "@ssh-tunnel/host-node";
-import type { ProbePort, ProcessPort, SpawnedProcess, StorePort, TerminalPort } from "@ssh-tunnel/host-node";
+import type {
+  ControlPort,
+  ProbePort,
+  ProcessPort,
+  RuntimeRecord,
+  SpawnedProcess,
+  StorePort,
+  TerminalPort,
+} from "@ssh-tunnel/host-node";
 import type { TunnelProfile } from "@ssh-tunnel/contract";
 
 function fakePorts(): {
@@ -341,6 +351,72 @@ describe("daemon API", () => {
         (candidate) => candidate.profileId === id,
       );
       expect(lateState?.origin).not.toBe("terminal");
+    });
+
+    it("adopts a managed tunnel after a daemon restart", async () => {
+      const ports = fakePorts();
+      const records: RuntimeRecord[] = [];
+      const runtime = {
+        async read(): Promise<readonly RuntimeRecord[]> {
+          return [...records];
+        },
+        async write(next: readonly RuntimeRecord[]): Promise<void> {
+          records.splice(0, records.length, ...next);
+        },
+      };
+      let alive = false;
+      const controlDir = `/tmp/ssh-tunnel-adopt-${process.pid}`;
+      const control: ControlPort = {
+        async check(): Promise<boolean> {
+          return alive;
+        },
+        async exit(): Promise<boolean> {
+          return true;
+        },
+      };
+      const options = {
+        process: ports.process,
+        probe: ports.probe,
+        store: ports.store,
+        clock: systemClock,
+        logDir: "/tmp/ssh-tunnel-test-logs",
+        controlDir,
+        control,
+        runtime,
+      };
+
+      const first = new TunnelManager(options);
+      const firstApp = createServiceApp({ manager: first, serviceInstanceId: "adopt-1" });
+      const created = await post(firstApp, "/api/profiles", INPUT);
+      const id = (created.json as { id: string }).id;
+      await post(firstApp, `/api/states/${id}/start`);
+
+      // Starting writes down what is up, including the control socket it asked
+      // ssh for.
+      expect(records).toHaveLength(1);
+      expect(records[0]?.origin).toBe("managed");
+      const startedPid = records[0]?.pid;
+      expect(startedPid).toBeGreaterThan(0);
+
+      // The daemon dies, the ssh process does not, and its socket still answers.
+      mkdirSync(controlDir, { recursive: true });
+      writeFileSync(join(controlDir, `${id}.sock`), "");
+      alive = true;
+
+      const second = new TunnelManager(options);
+      const secondApp = createServiceApp({ manager: second, serviceInstanceId: "adopt-2" });
+      const states = await get(secondApp, "/api/states");
+      const adopted = (
+        states.json as { states: { profileId: string; status: string; origin?: string; pid?: number }[] }
+      ).states.find((candidate) => candidate.profileId === id);
+      expect(adopted?.status).toBe("running");
+      expect(adopted?.origin).toBe("managed");
+      expect(adopted?.pid).toBe(startedPid);
+
+      // And the new daemon can end a tunnel it never spawned.
+      const stopped = await post(secondApp, `/api/states/${id}/stop`);
+      expect(stopped.status).toBe(200);
+      expect(records).toEqual([]);
     });
 
     it("reports a launcher that refuses the call as TerminalFailed (502)", async () => {

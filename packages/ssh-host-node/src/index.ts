@@ -11,4 +11,5 @@ export * from "./store.js";
 export * from "./ssh-config.js";
 export * from "./terminal.js";
 export * from "./control.js";
+export * from "./runtime-store.js";
 export * from "./open-url.js";

@@ -30,6 +30,8 @@ import type {
   ExternalSession,
   OpenUrlPort,
   ProbePort,
+  RuntimeRecord,
+  RuntimeStorePort,
   ProcessPort,
   SpawnedProcess,
   StorePort,
@@ -57,6 +59,8 @@ export interface ManagerOptions {
   readonly control?: ControlPort;
   /** Where per-profile ControlMaster sockets live. Default `~/.ssh-tunnel-ui/control`. */
   readonly controlDir?: string;
+  /** Optional: records which tunnels were up, so a restart can adopt them. */
+  readonly runtime?: RuntimeStorePort;
 }
 
 /**
@@ -116,6 +120,7 @@ export class TunnelManager {
   private readonly openUrlPort: OpenUrlPort | undefined;
   private readonly control: ControlPort | undefined;
   private readonly controlDir: string;
+  private readonly runtime: RuntimeStorePort | undefined;
   private readonly sessions = new Map<string, ExternalSession>();
   private profiles = new Map<string, TunnelProfile>();
   private states = new Map<string, TunnelState>();
@@ -133,6 +138,7 @@ export class TunnelManager {
     this.openUrlPort = options.openUrl;
     this.control = options.control;
     this.controlDir = options.controlDir ?? join(homedir(), ".ssh-tunnel-ui", "control");
+    this.runtime = options.runtime;
   }
 
   private async ensureLoaded(): Promise<void> {
@@ -147,6 +153,73 @@ export class TunnelManager {
       });
     }
     this.loaded = true;
+    await this.adoptRuntime();
+  }
+
+  /**
+   * Re-claim the tunnels the previous daemon wrote down.
+   *
+   * A record is a claim, not proof: the ControlMaster socket has to answer
+   * before it is trusted, because the ssh process may have died while the
+   * daemon was away (a reboot kills it, a crash does not). Entries that fail
+   * the check are dropped from the file on the way out.
+   */
+  private async adoptRuntime(): Promise<void> {
+    if (this.runtime === undefined || this.control === undefined) return;
+    const records = await this.runtime.read();
+    if (records.length === 0) return;
+    const keep: RuntimeRecord[] = [];
+    for (const record of records) {
+      const profile = this.profiles.get(record.profileId);
+      if (profile === undefined) continue;
+      if (!(await this.socketAlive(record.profileId, profile))) continue;
+      keep.push(record);
+      this.states.set(record.profileId, {
+        profileId: record.profileId,
+        status: "running",
+        origin: record.origin,
+        ...(record.pid === undefined ? {} : { pid: record.pid }),
+        startedAt: record.startedAt,
+        forwards: [],
+      });
+      if (record.origin === "terminal") {
+        this.sessions.set(record.profileId, {
+          profileId: record.profileId,
+          terminalId: record.terminalId ?? "terminal",
+          mode: record.mode ?? "tunnel",
+          command: buildSshArgv(profile, {
+            controlPath: this.controlPathFor(record.profileId),
+            interactive: record.mode === "shell",
+          }).command,
+          pid: record.pid ?? 0,
+          launchedAt: record.startedAt,
+        });
+      }
+    }
+    if (keep.length !== records.length) await this.runtime.write(keep);
+  }
+
+  /** Write down what is up now; a failed write must never fail the operation. */
+  private async persistRuntime(): Promise<void> {
+    if (this.runtime === undefined) return;
+    const records: RuntimeRecord[] = [];
+    for (const [id, state] of this.states) {
+      if (state.origin !== "managed" && state.origin !== "terminal") continue;
+      if (state.status !== "running" && state.status !== "degraded" && state.status !== "starting") {
+        continue;
+      }
+      const session = this.sessions.get(id);
+      records.push({
+        profileId: id,
+        origin: state.origin,
+        startedAt: state.startedAt ?? this.clock.nowIso(),
+        ...(state.pid === undefined ? {} : { pid: state.pid }),
+        ...(session === undefined
+          ? {}
+          : { mode: session.mode, terminalId: session.terminalId }),
+      });
+    }
+    await this.runtime.write(records);
   }
 
   private async persist(): Promise<void> {
@@ -260,6 +333,7 @@ export class TunnelManager {
     this.profiles.delete(id);
     this.states.delete(id);
     await this.persist();
+    await this.persistRuntime();
   }
 
   // -- runtime ---------------------------------------------------------------
@@ -288,6 +362,11 @@ export class TunnelManager {
     // Terminal-opened and externally-detected tunnels have no child of ours to
     // check: their truth comes from the control socket and the port probe.
     if (this.sessions.has(id) || state.origin === "terminal" || state.origin === "external") {
+      return state;
+    }
+    // A managed tunnel adopted from the runtime file has no child handle; the
+    // ControlMaster socket decides whether it is still alive.
+    if (state.origin === "managed" && !this.live.has(id)) {
       return state;
     }
     const live = this.live.get(id);
@@ -377,6 +456,7 @@ export class TunnelManager {
         }
         this.sessions.delete(id);
         const stillListening = await this.bindPortAnswers(profile);
+        await this.persistRuntime();
         this.states.set(
           id,
           stillListening
@@ -400,6 +480,20 @@ export class TunnelManager {
       // A managed child of ours is authoritative while it lives.
       const live = this.live.get(id);
       if (live !== undefined && this.process.isAlive(live.child.pid)) continue;
+      // Adopted after a restart: the socket is the only witness left.
+      if (state.origin === "managed") {
+        if (await this.socketAlive(id, profile)) continue;
+        this.states.set(id, {
+          ...state,
+          status: "stopped",
+          pid: undefined,
+          startedAt: undefined,
+          forwards: [],
+          lastError: "the tunnel exited while the daemon was not running",
+        });
+        await this.persistRuntime();
+        continue;
+      }
       // A master this daemon did not record but can still reach: a window from
       // before a restart, or one the user started with the same socket.
       if (await this.socketAlive(id, profile)) {
@@ -450,7 +544,14 @@ export class TunnelManager {
     }
     this.setStatus(id, "starting", { lastError: undefined });
 
-    const { argv } = buildSshArgv(profile);
+    // The same ControlMaster socket the terminal handoff uses: it is how a
+    // later daemon (after a restart) recognises this tunnel as its own.
+    try {
+      mkdirSync(this.controlDir, { recursive: true, mode: 0o700 });
+    } catch {
+      // A missing directory shows up as an ssh failure with its own message.
+    }
+    const { argv } = buildSshArgv(profile, { controlPath: this.controlPathFor(id) });
     try {
       mkdirSync(this.logDir, { recursive: true });
     } catch {
@@ -533,6 +634,7 @@ export class TunnelManager {
     if (running === undefined) {
       throw new TunnelError("InternalError", "state lost during start");
     }
+    await this.persistRuntime();
     // Best-effort first probe; failures mark degraded, never block start.
     void this.probeTunnel(id).catch(() => undefined);
     return (this.states.get(id) ?? running);
@@ -594,6 +696,7 @@ export class TunnelManager {
       this.live.delete(id);
     }
     this.setStatus(id, "stopped", { pid: undefined, startedAt: undefined });
+    await this.persistRuntime();
     const stopped = this.states.get(id);
     if (stopped === undefined) {
       throw new TunnelError("InternalError", "state lost during stop");
@@ -784,6 +887,7 @@ export class TunnelManager {
         lastError: undefined,
       });
     }
+    await this.persistRuntime();
     return session;
   }
 
@@ -829,6 +933,7 @@ export class TunnelManager {
       void this.control.exit(this.controlPathFor(id), sshDestination(profile));
     }
     this.sessions.delete(id);
+    void this.persistRuntime();
     return true;
   }
 }

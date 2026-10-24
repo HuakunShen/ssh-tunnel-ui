@@ -10,6 +10,7 @@ import {
   createNodeProbePort,
   createNodeProcessPort,
   createControlPort,
+  createFileRuntimeStore,
   createFileStorePort,
   createOpenUrlPort,
   createTerminalPort,
@@ -65,6 +66,8 @@ export async function startDaemon(options: ServeOptions = {}): Promise<{ port: n
     terminal: createTerminalPort(),
     openUrl: createOpenUrlPort(),
     control: createControlPort(options.sshPath ?? "ssh"),
+    // Next to the profiles: what was up when this daemon last wrote.
+    runtime: createFileRuntimeStore(join(dirname(storePath), "runtime.json")),
   });
   const instanceId = `svc-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
   const api = createServiceApp({ manager, serviceInstanceId: instanceId });

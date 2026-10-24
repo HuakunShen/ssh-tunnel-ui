@@ -65,6 +65,31 @@ export interface TerminalPort {
 }
 
 /**
+ * One tunnel that was running when the daemon last wrote its runtime file.
+ *
+ * Profiles are configuration and survive forever; this is the much smaller,
+ * disposable record of what was actually up. It exists so a daemon that
+ * restarts can say "this was ours, from that pid, started then" instead of
+ * inferring ownership from a listening port.
+ */
+export interface RuntimeRecord {
+  readonly profileId: string;
+  /** Only tunnels the daemon itself started are recorded. */
+  readonly origin: "managed" | "terminal";
+  readonly startedAt: string;
+  readonly pid?: number;
+  /** Terminal handoffs only: which window and whether it holds a shell. */
+  readonly mode?: "tunnel" | "shell";
+  readonly terminalId?: string;
+}
+
+/** Runtime records: best-effort persistence, never a reason to fail a boot. */
+export interface RuntimeStorePort {
+  read(): Promise<readonly RuntimeRecord[]>;
+  write(records: readonly RuntimeRecord[]): Promise<void>;
+}
+
+/**
  * OpenSSH control-socket operations, for tunnels this daemon does not own.
  *
  * A tunnel opened in the user's own terminal cannot be signalled by pid; the
