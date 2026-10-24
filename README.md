@@ -106,6 +106,19 @@ demand. Health still comes from TCP probing the forwarded ports, never from the
 process tree — so a window you close by hand is reported as stopped, not as a
 failure.
 
+### Terminal UIs and the CLI
+
+- `ssh-tunnel` (`apps/cli`) — scriptable commands: `list`, `add`, `start`,
+  `stop`, `logs`, `probe`, …; `--direct` runs without a daemon.
+- `ssh-tunnel-tui-solid` (`apps/tui-solid`) — full-screen console on the
+  [Uniview](https://github.com/HuakunShen/uniview) TUI engine with Solid
+  (`pnpm tui:solid`). Pure JavaScript, no native binding, so it runs the same
+  on macOS, Linux and Windows. Keys: ↑↓/jk select, enter start/stop, p probe,
+  l logs, d d delete, s stop all, r refresh, q quit. It talks to the daemon;
+  creating profiles is done with `ssh-tunnel add` or the web console.
+- `ssh-tunnel-tui` (`apps/tui`) — the earlier OpenTUI + React version, which
+  also has a create form and `--direct`.
+
 ### Platform notes
 
 macOS, Linux and Windows are all supported (CLI, web console, TUI and the

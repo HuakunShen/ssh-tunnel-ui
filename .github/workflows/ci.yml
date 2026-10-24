@@ -54,3 +54,8 @@ jobs:
 
       - name: Tests
         run: pnpm test:ci
+
+      # Pure-JS terminal UI (Uniview + Solid): runs on every OS with no native
+      # binding, unlike the OpenTUI one excluded from `test:ci`.
+      - name: Solid TUI tests
+        run: pnpm --filter @ssh-tunnel/tui-solid test
