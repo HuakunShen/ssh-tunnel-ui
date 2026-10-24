@@ -27,6 +27,31 @@ const SUFFIX = {
   ".exe": "-setup",
 };
 
+/**
+ * Updater archives, matched by filename tail (their extensions alone — `.gz`,
+ * `.zip` — are too generic to key on). Renaming is safe: the `.sig` signs the
+ * file bytes, never the name, and `latest.json` points at the renamed files.
+ * Each entry maps a filename tail to the release-name suffix.
+ */
+const UPDATER = [
+  [".app.tar.gz", ".app.tar.gz"],
+  [".AppImage.tar.gz", ".AppImage.tar.gz"],
+  ["-setup.nsis.zip", "-setup.nsis.zip"],
+];
+
+function updaterName(file) {
+  for (const [tail, suffix] of UPDATER) {
+    if (file.endsWith(tail)) return suffix;
+  }
+  if (file.endsWith(".sig")) {
+    const withoutSig = file.slice(0, -".sig".length);
+    for (const [tail, suffix] of UPDATER) {
+      if (withoutSig.endsWith(tail)) return `${suffix}.sig`;
+    }
+  }
+  return undefined;
+}
+
 function arg(name, fallback) {
   const index = process.argv.indexOf(`--${name}`);
   if (index === -1 || process.argv[index + 1] === undefined) return fallback;
@@ -76,6 +101,21 @@ function walk(dir, found = []) {
 mkdirSync(outDir, { recursive: true });
 const copied = [];
 for (const path of walk(bundleRoot)) {
+  const file = basename(path);
+  const updateSuffix = updaterName(file);
+  if (updateSuffix !== undefined) {
+    // Updater archives ride along only when the build signed them: without
+    // the key there is a tarball but no `.sig`, and an unsigned update feed
+    // is worse than none.
+    const sig = updateSuffix.endsWith(".sig")
+      ? path
+      : `${path}.sig`;
+    if (!existsSync(sig)) continue;
+    const name = `TunnelDeck-${version}-${label}${updateSuffix}`;
+    copyFileSync(path, join(outDir, name));
+    copied.push(name);
+    continue;
+  }
   const suffix = SUFFIX[extname(path).toLowerCase()];
   if (suffix === undefined) continue;
   const name = `TunnelDeck-${version}-${label}${suffix}${extname(path)}`;

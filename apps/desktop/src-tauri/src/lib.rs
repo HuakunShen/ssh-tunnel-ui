@@ -18,6 +18,7 @@ pub fn run() {
     let builder = tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(tunnel_commands::app_state());
     let builder = if std::env::var("SSH_TUNNEL_WEBDRIVER").is_ok() {
         builder.plugin(tauri_plugin_wdio_webdriver::init())

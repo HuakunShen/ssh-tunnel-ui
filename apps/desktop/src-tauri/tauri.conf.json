@@ -48,5 +48,15 @@
     "macOS": {
       "signingIdentity": "-"
     }
+  },
+  "plugins": {
+    "updater": {
+      "active": true,
+      "dialog": false,
+      "endpoints": [
+        "https://github.com/HuakunShen/tunnel-deck/releases/latest/download/latest.json"
+      ],
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IERCMDJBMUE2REU3OUE5N0EKUldSNnFYbmVwcUVDMjVaVW9VMnBSZlJVWG9DNFdBMUdkUWNJNHdiRmtORlRwN2R1Zm13TGlPOEYK"
+    }
   }
 }
