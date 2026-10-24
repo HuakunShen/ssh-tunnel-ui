@@ -231,7 +231,8 @@ describe("daemon API", () => {
       // the plain equivalent a user can copy anywhere.
       const preview = await get(app, `/api/profiles/${id}/preview`);
       const withoutControl = body.command.replace(
-        /-o ControlMaster=yes -o ControlPath=\S+ -o ControlPersist=no /,
+        // The path is shell-quoted when it holds a backslash (Windows).
+        /-o ControlMaster=yes -o ControlPath=(?:'[^']*'|"[^"]*"|\S+) -o ControlPersist=no /,
         "",
       );
       expect(withoutControl).toBe((preview.json as { command: string }).command);
