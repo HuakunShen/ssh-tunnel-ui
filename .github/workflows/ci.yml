@@ -17,7 +17,14 @@ concurrency:
 
 jobs:
   check:
-    runs-on: macos-latest
+    name: check — ${{ matrix.os }}
+    # The tool ships for all three desktops, so the CLI, daemon and tests are
+    # gated on all three, not just the development machine.
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-22.04, windows-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -54,6 +61,19 @@ jobs:
       # OpenTUI one excluded from `test:ci` it runs anywhere.
       - name: Solid TUI tests
         run: pnpm --filter @ssh-tunnel/tui-solid test
+
+      # A real daemon and the real CLI against it, on every OS: the API, the
+      # bundled Web UI and the CLI's discovery all have to work end to end.
+      - name: Smoke test the daemon, Web UI and CLI
+        shell: bash
+        run: |
+          export HOME="$RUNNER_TEMP/smoke-home" USERPROFILE="$RUNNER_TEMP/smoke-home"
+          mkdir -p "$HOME"
+          node apps/server/dist/server.mjs --port=7499 --web-dir=apps/web/dist &
+          for i in $(seq 1 30); do curl -fs http://127.0.0.1:7499/api/health && break; sleep 1; done
+          curl -fs http://127.0.0.1:7499/ | grep -qi "<html"
+          node apps/cli/dist/cli.mjs list --daemon=http://127.0.0.1:7499
+          kill %1
 
   # The release builds the shell on three operating systems; if one of them
   # stops compiling, a tag is the worst place to find out. `cargo check` is the
