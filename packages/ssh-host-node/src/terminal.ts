@@ -27,7 +27,7 @@ import {
   statSync,
   unlinkSync,
 } from "node:fs";
-import { join } from "node:path";
+import { delimiter, join } from "node:path";
 import { homedir, platform, tmpdir } from "node:os";
 import type { LaunchMode } from "@ssh-tunnel/contract";
 import type { TerminalPort, TerminalTargetInfo } from "./ports.js";
@@ -50,15 +50,37 @@ function canRead(path: string): boolean {
   }
 }
 
-function whichOnPath(command: string): string | undefined {
-  const path = process.env["PATH"] ?? "";
-  for (const dir of path.split(":")) {
+/**
+ * Names a command may carry on disk. POSIX uses it as written; Windows tries
+ * the `PATHEXT` suffixes unless the name already has an extension (`wt.exe`).
+ */
+function candidateNames(command: string, hostPlatform: NodeJS.Platform): readonly string[] {
+  if (hostPlatform !== "win32" || /\.[A-Za-z0-9]+$/.test(command)) return [command];
+  const extensions = (process.env["PATHEXT"] ?? ".COM;.EXE;.BAT;.CMD")
+    .split(";")
+    .filter((extension) => extension !== "");
+  return [command, ...extensions.map((extension) => `${command}${extension}`)];
+}
+
+function whichOnPath(
+  command: string,
+  hostPlatform: NodeJS.Platform = platform(),
+): string | undefined {
+  // Windows spells the variable `Path` and joins entries with `;`; `delimiter`
+  // is that of the running OS, and the lookup is case-insensitive there.
+  const path =
+    process.env["PATH"] ??
+    Object.entries(process.env).find(([key]) => key.toUpperCase() === "PATH")?.[1] ??
+    "";
+  for (const dir of path.split(delimiter)) {
     if (dir === "") continue;
-    const candidate = join(dir, command);
-    try {
-      if (statSync(candidate).isFile() && canRead(candidate)) return candidate;
-    } catch {
-      // Not this directory.
+    for (const name of candidateNames(command, hostPlatform)) {
+      const candidate = join(dir, name);
+      try {
+        if (statSync(candidate).isFile() && canRead(candidate)) return candidate;
+      } catch {
+        // Not this directory.
+      }
     }
   }
   return undefined;
@@ -213,6 +235,22 @@ const linuxTargets: readonly TerminalTarget[] = [
     argvFor: (cmd) => ["--", "/bin/sh", "-lc", cmd],
   },
   {
+    id: "xfce4-terminal",
+    label: "Xfce Terminal",
+    hint: "xfce4-terminal",
+    platform: "linux",
+    command: "xfce4-terminal",
+    argvFor: (cmd) => ["-x", "/bin/sh", "-lc", cmd],
+  },
+  {
+    id: "wezterm",
+    label: "WezTerm",
+    hint: "wezterm",
+    platform: "linux",
+    command: "wezterm",
+    argvFor: (cmd) => ["start", "--", "/bin/sh", "-lc", cmd],
+  },
+  {
     id: "xterm",
     label: "XTerm",
     hint: "xterm",
@@ -229,7 +267,18 @@ const windowsTargets: readonly TerminalTarget[] = [
     hint: "wt.exe",
     platform: "win32",
     command: "wt.exe",
-    argvFor: (cmd) => ["new-tab", "--title", "SSH Tunnel", "cmd.exe", "/c", cmd],
+    // PowerShell rather than cmd: Node escapes embedded quotes as `\"`, which
+    // PowerShell's argument parser undoes and cmd.exe does not. `wt` itself
+    // reads `;` as "next command", so a literal one is escaped.
+    argvFor: (cmd) => [
+      "new-tab",
+      "--title",
+      "SSH Tunnel",
+      "powershell.exe",
+      "-NoExit",
+      "-Command",
+      cmd.replace(/;/g, "\\;"),
+    ],
   },
   {
     id: "powershell",
@@ -283,7 +332,7 @@ export function detectTerminals(
       // The bundle is the installation signal: PATH shims are absent for most
       // of these apps, and `osascript`/`open` launchers must not count.
       if (absolutePath === undefined) continue;
-    } else if (whichOnPath(target.command) === undefined) {
+    } else if (whichOnPath(target.command, hostPlatform) === undefined) {
       continue;
     }
     found.push(
@@ -371,6 +420,7 @@ export function createTerminalPort(
       }
       const child = spawn(target.command, [...target.argvFor(commandLine)], {
         detached: true,
+        windowsHide: true,
         stdio: ["ignore", "ignore", logFd],
       });
       if (typeof logFd === "number") closeSync(logFd);
@@ -409,6 +459,19 @@ export function createTerminalPort(
     },
 
     close(pid: number): void {
+      if (hostPlatform === "win32") {
+        // A signal only reaches the launcher; `/T` also takes the shell and
+        // `ssh` it started inside the window.
+        try {
+          spawn("taskkill", ["/PID", String(pid), "/T", "/F"], {
+            stdio: "ignore",
+            windowsHide: true,
+          }).on("error", () => undefined);
+        } catch {
+          // Already gone.
+        }
+        return;
+      }
       try {
         process.kill(pid, "SIGTERM");
       } catch {

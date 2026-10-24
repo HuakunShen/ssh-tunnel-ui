@@ -94,8 +94,8 @@ the editor, and two affordances act on it:
   anywhere, including a machine with no daemon.
 - **Open in ▾** lists the terminals actually installed on *this* machine
   (`GET /api/terminals`) — Terminal, iTerm2, Warp, Ghostty, kitty, WezTerm,
-  Alacritty, VS Code on macOS; GNOME Terminal, Konsole, Alacritty, kitty, XTerm
-  on Linux; Windows Terminal and PowerShell on Windows. Detection is pure
+  Alacritty, VS Code on macOS; GNOME Terminal, Konsole, Xfce Terminal, Alacritty,
+  kitty, WezTerm, XTerm on Linux; Windows Terminal and PowerShell on Windows. Detection is pure
   filesystem probing (`.app` bundle on macOS, executable on PATH elsewhere) and
   nothing is probed until you click.
 
@@ -105,6 +105,17 @@ deleting it closes it, and `DELETE /api/profiles/:id/session` closes it on
 demand. Health still comes from TCP probing the forwarded ports, never from the
 process tree — so a window you close by hand is reported as stopped, not as a
 failure.
+
+### Platform notes
+
+macOS, Linux and Windows are all supported (CLI, web console, TUI and the
+Tauri app); the daemon needs Node ≥ 20 and the system OpenSSH client on `PATH`.
+Windows' OpenSSH has no `ControlMaster`, so there the daemon follows a tunnel
+by its pid and its forwarded ports instead of an `ssh -O check` socket: a
+tunnel opened through "Open in…" is still launched and closed from the console,
+but one that outlives a daemon restart is not re-adopted. The Windows window
+material (Mica) and the Liquid Glass look are macOS-only; other platforms use
+the opaque palette.
 
 ## Quickstart
 

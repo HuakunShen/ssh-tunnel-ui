@@ -32,9 +32,7 @@
   },
   "bundle": {
     "active": true,
-    "targets": [
-      "app"
-    ],
+    "targets": "all",
     "category": "Utility",
     "shortDescription": "One-click SSH tunnel manager.",
     "icon": [

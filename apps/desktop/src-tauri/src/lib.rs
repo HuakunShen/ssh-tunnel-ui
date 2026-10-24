@@ -110,6 +110,12 @@ fn wait_for_daemon(deadline: Duration) -> bool {
     health_ok()
 }
 
+/// File names a Node interpreter goes by on this platform.
+#[cfg(windows)]
+const NODE_NAMES: &[&str] = &["node.exe"];
+#[cfg(not(windows))]
+const NODE_NAMES: &[&str] = &["node"];
+
 /// A `node` found by walking `PATH`, without starting a shell.
 fn node_on_path() -> Option<PathBuf> {
     node_in_path(&std::env::var_os("PATH")?)
@@ -119,7 +125,7 @@ fn node_on_path() -> Option<PathBuf> {
 /// mutating the process environment the other tests share.
 fn node_in_path(path: &std::ffi::OsStr) -> Option<PathBuf> {
     std::env::split_paths(path)
-        .map(|dir| dir.join("node"))
+        .flat_map(|dir| NODE_NAMES.iter().map(move |name| dir.join(name)))
         .find(|candidate| candidate.is_file())
 }
 
@@ -130,11 +136,14 @@ fn node_in_path(path: &std::ffi::OsStr) -> Option<PathBuf> {
 /// keg-only Homebrew prefix. The login shell is the only source that agrees
 /// with the terminal the user actually runs — and its `PATH` is also what makes
 /// the daemon find the same `ssh` they do.
+#[cfg(unix)]
 fn login_shell_probe() -> Option<(PathBuf, String)> {
+    // zsh is macOS's default; elsewhere `/bin/sh` is the one that must exist.
+    let fallback = if cfg!(target_os = "macos") { "/bin/zsh" } else { "/bin/sh" };
     let shell = std::env::var("SHELL")
         .ok()
         .filter(|value| !value.is_empty())
-        .unwrap_or_else(|| "/bin/zsh".to_string());
+        .unwrap_or_else(|| fallback.to_string());
     let output = std::process::Command::new(shell)
         .args(["-l", "-c", "command -v node; printenv PATH"])
         .stdin(std::process::Stdio::null())
@@ -143,7 +152,14 @@ fn login_shell_probe() -> Option<(PathBuf, String)> {
     parse_shell_probe(&String::from_utf8_lossy(&output.stdout))
 }
 
+/// Windows GUI apps inherit the user's real `PATH`; there is no login shell to ask.
+#[cfg(not(unix))]
+fn login_shell_probe() -> Option<(PathBuf, String)> {
+    None
+}
+
 /// Read `command -v node` + `printenv PATH` output into an interpreter and PATH.
+#[cfg_attr(not(unix), allow(dead_code))]
 fn parse_shell_probe(stdout: &str) -> Option<(PathBuf, String)> {
     let mut lines = stdout.lines().map(str::trim).filter(|line| !line.is_empty());
     let node = lines.next()?;
@@ -202,6 +218,15 @@ fn spawn_sidecar(app: &tauri::AppHandle) -> Result<(), String> {
     {
         use std::os::unix::process::CommandExt as _;
         command.process_group(0);
+    }
+    // Windows: no console window for the daemon, and a process group of its
+    // own so closing the app does not deliver Ctrl+C to it.
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt as _;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        const CREATE_NEW_PROCESS_GROUP: u32 = 0x0000_0200;
+        command.creation_flags(CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP);
     }
     command.spawn().map(|_| ()).map_err(|error| {
         // The window will say so; a silent failure here looks like a hang.
@@ -311,15 +336,15 @@ mod tests {
     #[test]
     fn node_in_path_finds_the_executable_and_ignores_a_directory() {
         let dir = std::env::temp_dir().join(format!("ssh-tunnel-path-{}", std::process::id()));
-        let fake = dir.join("node");
+        let fake = dir.join(NODE_NAMES[0]);
         fs::create_dir_all(&fake).unwrap();
         let empty = dir.join("empty");
         fs::create_dir_all(&empty).unwrap();
         // A directory named `node` is not an interpreter.
         assert_eq!(node_in_path(empty.as_os_str()), None);
         fs::remove_dir(&fake).unwrap();
-        fs::write(dir.join("node"), "#!/bin/sh\n").unwrap();
-        assert_eq!(node_in_path(dir.as_os_str()), Some(dir.join("node")));
+        fs::write(dir.join(NODE_NAMES[0]), "#!/bin/sh\n").unwrap();
+        assert_eq!(node_in_path(dir.as_os_str()), Some(dir.join(NODE_NAMES[0])));
         fs::remove_dir_all(&dir).unwrap();
     }
 

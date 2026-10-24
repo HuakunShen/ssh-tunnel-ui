@@ -43,10 +43,6 @@ objc2 = "0.6.4"
 objc2-app-kit = { version = "0.3.2", default-features = false, features = ["std", "NSColor", "NSView", "NSVisualEffectView", "NSWindow"] }
 objc2-foundation = { version = "0.3.2", default-features = false, features = ["std", "NSString"] }
 
-[target.'cfg(windows)'.dependencies]
-# Windows 11 acrylic for the same reason as macOS above.
-window-vibrancy = "0.8.1"
-
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 

@@ -17,7 +17,12 @@ concurrency:
 
 jobs:
   check:
-    runs-on: macos-latest
+    # The tool is meant to run on all three desktops, so all three are gated.
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
         with:

@@ -40,7 +40,7 @@ import type {
   TerminalTargetInfo,
 } from "@ssh-tunnel/host-node";
 import { closeSync, existsSync, mkdirSync, openSync, readSync, statSync } from "node:fs";
-import { homedir } from "node:os";
+import { homedir, platform } from "node:os";
 import { join } from "node:path";
 
 export interface ManagerOptions {
@@ -60,6 +60,12 @@ export interface ManagerOptions {
   readonly control?: ControlPort;
   /** Where per-profile ControlMaster sockets live. Default `~/.ssh-tunnel-ui/control`. */
   readonly controlDir?: string;
+  /**
+   * Whether this OS can host an OpenSSH `ControlMaster` socket. Defaults to
+   * everything but Windows, whose OpenSSH build rejects the option; without it
+   * the daemon falls back to pids and port probes to follow a tunnel.
+   */
+  readonly controlSupported?: boolean;
   /** Optional: records which tunnels were up, so a restart can adopt them. */
   readonly runtime?: RuntimeStorePort;
 }
@@ -121,6 +127,7 @@ export class TunnelManager {
   private readonly openUrlPort: OpenUrlPort | undefined;
   private readonly control: ControlPort | undefined;
   private readonly controlDir: string;
+  private readonly controlSupported: boolean;
   private readonly runtime: RuntimeStorePort | undefined;
   private readonly sessions = new Map<string, ExternalSession>();
   private profiles = new Map<string, TunnelProfile>();
@@ -137,7 +144,8 @@ export class TunnelManager {
     this.maxProfiles = options.maxProfiles ?? 200;
     this.terminal = options.terminal;
     this.openUrlPort = options.openUrl;
-    this.control = options.control;
+    this.controlSupported = options.controlSupported ?? platform() !== "win32";
+    this.control = this.controlSupported ? options.control : undefined;
     this.controlDir = options.controlDir ?? join(homedir(), ".ssh-tunnel-ui", "control");
     this.runtime = options.runtime;
   }
@@ -184,12 +192,13 @@ export class TunnelManager {
         forwards: [],
       });
       if (record.origin === "terminal") {
+        const adoptedControlPath = this.controlPathFor(record.profileId);
         this.sessions.set(record.profileId, {
           profileId: record.profileId,
           terminalId: record.terminalId ?? "terminal",
           mode: record.mode ?? "tunnel",
           command: buildSshArgv(profile, {
-            controlPath: this.controlPathFor(record.profileId),
+            ...(adoptedControlPath === undefined ? {} : { controlPath: adoptedControlPath }),
             interactive: record.mode === "shell",
           }).command,
           pid: record.pid ?? 0,
@@ -388,8 +397,9 @@ export class TunnelManager {
   }
 
 
-  private controlPathFor(id: string): string {
-    return join(this.controlDir, `${id}.sock`);
+  /** The profile's socket path, or `undefined` where the OS has no such thing. */
+  private controlPathFor(id: string): string | undefined {
+    return this.controlSupported ? join(this.controlDir, `${id}.sock`) : undefined;
   }
 
   /**
@@ -400,8 +410,8 @@ export class TunnelManager {
    * left behind by a killed master answers "not running" and is ignored.
    */
   private async socketAlive(id: string, profile: TunnelProfile): Promise<boolean> {
-    if (this.control === undefined) return false;
     const socketPath = this.controlPathFor(id);
+    if (this.control === undefined || socketPath === undefined) return false;
     if (!existsSync(socketPath)) return false;
     return this.control.check(socketPath, sshDestination(profile));
   }
@@ -437,9 +447,13 @@ export class TunnelManager {
       if (profile === undefined) continue;
       const session = this.sessions.get(id);
       if (session !== undefined) {
+        const socketPath = this.controlPathFor(id);
+        // Without a control socket the launcher pid and the bound ports are
+        // the only witnesses there are.
         const alive =
-          this.control !== undefined &&
-          (await this.control.check(this.controlPathFor(id), sshDestination(profile)));
+          this.control !== undefined && socketPath !== undefined
+            ? await this.control.check(socketPath, sshDestination(profile))
+            : this.process.isAlive(session.pid) || (await this.bindPortAnswers(profile));
         if (alive) {
           this.states.set(id, {
             ...state,
@@ -552,7 +566,8 @@ export class TunnelManager {
     } catch {
       // A missing directory shows up as an ssh failure with its own message.
     }
-    const { argv } = buildSshArgv(profile, { controlPath: this.controlPathFor(id) });
+    const controlPath = this.controlPathFor(id);
+    const { argv } = buildSshArgv(profile, controlPath === undefined ? {} : { controlPath });
     try {
       mkdirSync(this.logDir, { recursive: true });
     } catch {
@@ -680,8 +695,11 @@ export class TunnelManager {
     if (session !== undefined || socketOwned) {
       // A window we did not spawn: ask OpenSSH to close its master, which ends
       // the session that owns the forwards.
-      if (this.control !== undefined) {
-        await this.control.exit(this.controlPathFor(id), sshDestination(profile));
+      const socketPath = this.controlPathFor(id);
+      if (this.control !== undefined && socketPath !== undefined) {
+        await this.control.exit(socketPath, sshDestination(profile));
+      } else if (session !== undefined) {
+        this.terminal?.close(session.pid);
       }
       this.sessions.delete(id);
     }
@@ -895,9 +913,11 @@ export class TunnelManager {
     } catch {
       // A missing directory surfaces as a failed ssh below, with its own words.
     }
+    const launchControlPath = this.controlPathFor(id);
     const commandLine = buildSshArgv(profile, {
-      controlPath: this.controlPathFor(id),
+      ...(launchControlPath === undefined ? {} : { controlPath: launchControlPath }),
       interactive: mode === "shell",
+      quoting: platform() === "win32" ? "windows" : "posix",
     }).command;
     let pid: number;
     try {
@@ -984,8 +1004,9 @@ export class TunnelManager {
     if (session === undefined) return false;
     this.terminal?.close(session.pid);
     const profile = this.profiles.get(id);
-    if (this.control !== undefined && profile !== undefined) {
-      void this.control.exit(this.controlPathFor(id), sshDestination(profile));
+    const socketPath = this.controlPathFor(id);
+    if (this.control !== undefined && profile !== undefined && socketPath !== undefined) {
+      void this.control.exit(socketPath, sshDestination(profile));
     }
     this.sessions.delete(id);
     void this.persistRuntime();
