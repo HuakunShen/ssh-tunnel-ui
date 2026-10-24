@@ -90,7 +90,7 @@ jobs:
         working-directory: apps/desktop/src-tauri
         run: cargo check --workspace
 
-      - name: Shell unit tests (macOS only: the window material is macOS code)
+      - name: Shell unit tests
         if: runner.os == 'macOS'
         working-directory: apps/desktop/src-tauri
         run: cargo test
