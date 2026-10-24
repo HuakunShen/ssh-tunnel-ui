@@ -5,7 +5,7 @@
   "identifier": "dev.sshtunnel.ui",
   "build": {
     "frontendDist": "../../web/dist",
-    "devUrl": "http://127.0.0.1:7432",
+    "devUrl": "http://127.0.0.1:5173",
     "beforeDevCommand": "",
     "beforeBuildCommand": ""
   },
@@ -27,7 +27,7 @@
     ],
     "withGlobalTauri": false,
     "security": {
-      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' ipc: http://ipc.localhost http://127.0.0.1:7432; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' ipc: http://ipc.localhost; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
     }
   },
   "bundle": {
@@ -44,10 +44,6 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ],
-    "resources": [
-      "../../server/dist/server.mjs",
-      "../../web/dist"
     ],
     "macOS": {
       "signingIdentity": "-"

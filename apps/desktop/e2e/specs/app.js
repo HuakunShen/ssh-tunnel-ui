@@ -1,7 +1,7 @@
 /**
  * Desktop e2e: the bundled app opens its window and renders the tunnel
- * console. The shell attaches to a running daemon when one answers on
- * :7432, so these specs need the daemon up (the dev loop always has it).
+ * console. The manager is linked in-process, so these specs need nothing
+ * beyond the app itself.
  */
 describe("SSH Tunnel desktop app", () => {
   it("opens the main window titled SSH Tunnel", async () => {
