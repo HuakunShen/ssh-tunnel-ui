@@ -4,7 +4,6 @@
  */
 import { beforeEach, describe, expect, it } from "vitest";
 import { mkdirSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { TunnelManager, createServiceApp } from "@ssh-tunnel/service";
 import { systemClock } from "@ssh-tunnel/host-node";
@@ -100,7 +99,7 @@ describe("daemon API", () => {
       probe: ports.probe,
       store: ports.store,
       clock: systemClock,
-      logDir: join(tmpdir(), "ssh-tunnel-test-logs"),
+      logDir: "/tmp/ssh-tunnel-test-logs",
     });
     app = createServiceApp({ manager, serviceInstanceId: "test-instance" });
   });
@@ -157,24 +156,6 @@ describe("daemon API", () => {
     expect((again.json as { problem: { code: string } }).problem.code).toBe("Conflict");
   });
 
-  it("starts without a ControlMaster socket where the OS has none (Windows)", async () => {
-    const ports = fakePorts();
-    const manager = new TunnelManager({
-      process: ports.process,
-      probe: ports.probe,
-      store: ports.store,
-      clock: systemClock,
-      logDir: join(tmpdir(), "ssh-tunnel-test-logs"),
-      controlSupported: false,
-    });
-    const winApp = createServiceApp({ manager, serviceInstanceId: "test-instance" });
-    const created = await post(winApp, "/api/profiles", INPUT);
-    const id = (created.json as { id: string }).id;
-    const started = await post(winApp, `/api/states/${id}/start`);
-    expect(started.status).toBe(200);
-    expect(ports.spawned[0]?.argv.join(" ")).not.toContain("Control");
-  });
-
   describe("terminal sessions", () => {
     let launched: { terminalId: string; commandLine: string }[];
     let closed: number[];
@@ -205,9 +186,8 @@ describe("daemon API", () => {
         probe: ports.probe,
         store: ports.store,
         clock: systemClock,
-        logDir: join(tmpdir(), "ssh-tunnel-test-logs"),
-        controlDir: join(tmpdir(), "ssh-tunnel-test-control"),
-        controlSupported: true,
+        logDir: "/tmp/ssh-tunnel-test-logs",
+        controlDir: "/tmp/ssh-tunnel-test-control",
         terminal,
         control: {
           async check(): Promise<boolean> {
@@ -286,9 +266,8 @@ describe("daemon API", () => {
         probe: ports.probe,
         store: ports.store,
         clock: systemClock,
-        logDir: join(tmpdir(), "ssh-tunnel-test-logs"),
-        controlDir: join(tmpdir(), "ssh-tunnel-test-control"),
-        controlSupported: true,
+        logDir: "/tmp/ssh-tunnel-test-logs",
+        controlDir: "/tmp/ssh-tunnel-test-control",
         terminal: {
           detect: () => [
             { id: "warp", label: "Warp", hint: "dev.warp.Warp-Stable", platform: "darwin" },
@@ -331,9 +310,8 @@ describe("daemon API", () => {
         probe: ports.probe,
         store: ports.store,
         clock: { nowIso: () => new Date(now).toISOString() },
-        logDir: join(tmpdir(), "ssh-tunnel-test-logs"),
-        controlDir: join(tmpdir(), "ssh-tunnel-test-control"),
-        controlSupported: true,
+        logDir: "/tmp/ssh-tunnel-test-logs",
+        controlDir: "/tmp/ssh-tunnel-test-control",
         terminal: {
           detect: () => [
             { id: "warp", label: "Warp", hint: "dev.warp.Warp-Stable", platform: "darwin" },
@@ -387,7 +365,7 @@ describe("daemon API", () => {
         },
       };
       let alive = false;
-      const controlDir = join(tmpdir(), `ssh-tunnel-adopt-${process.pid}`);
+      const controlDir = `/tmp/ssh-tunnel-adopt-${process.pid}`;
       const control: ControlPort = {
         async check(): Promise<boolean> {
           return alive;
@@ -401,9 +379,8 @@ describe("daemon API", () => {
         probe: ports.probe,
         store: ports.store,
         clock: systemClock,
-        logDir: join(tmpdir(), "ssh-tunnel-test-logs"),
+        logDir: "/tmp/ssh-tunnel-test-logs",
         controlDir,
-        controlSupported: true,
         control,
         runtime,
       };
@@ -462,9 +439,8 @@ describe("daemon API", () => {
         probe: ports.probe,
         store: ports.store,
         clock: systemClock,
-        logDir: join(tmpdir(), "ssh-tunnel-test-logs"),
-        controlDir: join(tmpdir(), "ssh-tunnel-test-control"),
-        controlSupported: true,
+        logDir: "/tmp/ssh-tunnel-test-logs",
+        controlDir: "/tmp/ssh-tunnel-test-control",
         terminal: refusing,
       });
       const refusingApp = createServiceApp({ manager, serviceInstanceId: "test-refusing" });

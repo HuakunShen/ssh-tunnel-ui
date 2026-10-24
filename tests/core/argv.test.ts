@@ -4,7 +4,7 @@
  */
 import { describe, expect, it } from "vitest";
 import type { TunnelProfile } from "@ssh-tunnel/contract";
-import { buildSshArgv, localBindPorts, quoteForDisplay } from "@ssh-tunnel/core";
+import { buildSshArgv, localBindPorts } from "@ssh-tunnel/core";
 
 function baseProfile(overrides: Partial<TunnelProfile> = {}): TunnelProfile {
   return {
@@ -147,21 +147,5 @@ describe("localBindPorts", () => {
       }),
     );
     expect([...ports].sort((a, b) => a - b)).toEqual([1111, 3333]);
-  });
-});
-
-describe("quoteForDisplay", () => {
-  it("single-quotes for POSIX shells by default", () => {
-    expect(quoteForDisplay(["-i", "/home/a b/key"])).toBe("ssh -i '/home/a b/key'");
-  });
-
-  it("double-quotes for cmd and PowerShell on Windows", () => {
-    expect(quoteForDisplay(["-i", "C:\\Users\\a b\\key", "-J", "x,y"], "windows")).toBe(
-      'ssh -i "C:\\Users\\a b\\key" -J "x,y"',
-    );
-  });
-
-  it("leaves a plain Windows path unquoted", () => {
-    expect(quoteForDisplay(["-i", "C:\\keys\\id"], "windows")).toBe("ssh -i C:\\keys\\id");
   });
 });

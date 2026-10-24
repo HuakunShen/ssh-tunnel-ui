@@ -48,10 +48,9 @@ pub fn create_main_window(app: &mut tauri::App) -> tauri::Result<()> {
         .build()?;
     #[cfg(target_os = "macos")]
     macos::install(&window);
-    // Windows and Linux keep the opaque palette: Mica/acrylic only show through
-    // a transparent webview, and an untested half-transparent page is worse
-    // than a solid one.
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(target_os = "windows")]
+    windows::install(&window);
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
     publish(&window, "none");
     let _ = &window;
     Ok(())
@@ -167,5 +166,24 @@ mod macos {
             }
         }
         "none"
+    }
+}
+
+#[cfg(target_os = "windows")]
+mod windows {
+    use window_vibrancy::{apply_acrylic, apply_mica};
+
+    /// Mica backdrops a whole window; acrylic tints it. Prefer mica and fall
+    /// back, so a build without it still gets *some* material.
+    ///
+    /// The window itself is passed in: `window-vibrancy` wants
+    /// `HasWindowHandle`, which Tauri's `WebviewWindow` implements, while a raw
+    /// `HWND` from `window.hwnd()` comes from whichever `windows` crate version
+    /// Tauri pinned and does not.
+    pub fn install(window: &tauri::WebviewWindow) {
+        let installed = apply_mica(window, None).is_ok() || apply_acrylic(window, None).is_ok();
+        let backdrop = if installed { "vibrancy" } else { "none" };
+        let _ = super::INSTALLED.set(backdrop);
+        super::publish(window, backdrop);
     }
 }

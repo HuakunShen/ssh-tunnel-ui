@@ -27,26 +27,10 @@ export interface ArgvOptions {
   readonly controlPath?: string;
   /** Give the terminal an interactive login shell instead of `-N`. */
   readonly interactive?: boolean;
-  /** Shell dialect of the rendered `command`; `windows` for cmd/PowerShell. */
-  readonly quoting?: QuoteStyle;
 }
 
-/** `posix` single-quotes; `windows` double-quotes, which cmd and PowerShell both read. */
-export type QuoteStyle = "posix" | "windows";
-
 /** Quote one argv element for display only (never for execution). */
-export function quoteForDisplay(
-  argv: readonly string[],
-  style: QuoteStyle = "posix",
-): string {
-  if (style === "windows") {
-    // No comma in the bare set: PowerShell turns `-J a,b` into an array.
-    return ["ssh", ...argv]
-      .map((part) =>
-        /^[A-Za-z0-9_@%+=:./\\-]+$/.test(part) ? part : `"${part.replace(/"/g, '\\"')}"`,
-      )
-      .join(" ");
-  }
+export function quoteForDisplay(argv: readonly string[]): string {
   return ["ssh", ...argv]
     .map((part) =>
       /^[A-Za-z0-9_@%+=:,./-]+$/.test(part)
@@ -161,7 +145,7 @@ export function buildSshArgv(
     argv.push("-N");
   }
 
-  return { argv, command: quoteForDisplay(argv, options.quoting) };
+  return { argv, command: quoteForDisplay(argv) };
 }
 
 /** `user@host` as the profile asks for it; also what `-O` commands need. */
