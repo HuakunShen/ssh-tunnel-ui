@@ -407,6 +407,32 @@ where
         }
     }
 
+    /// Reclaim this profile's control-socket path before a new master binds it.
+    ///
+    /// A dead master leaves its socket file behind; a new ssh would then warn
+    /// "already exists, disabling multiplexing" and run without one —
+    /// unstoppable and unadoptable afterwards. Remove the file when nothing
+    /// answers behind it; refuse when something does, so a live session (our
+    /// window or the user's own) is never stolen.
+    fn reclaim_socket(&self, id: &str, profile: &TunnelProfile) -> Result<()> {
+        if !self.multiplexed {
+            return Ok(());
+        }
+        let _ = std::fs::create_dir_all(&self.control_dir);
+        let socket = self.control_path_for(id);
+        if !socket.exists() {
+            return Ok(());
+        }
+        if self.socket_alive(id, profile) {
+            return Err(TunnelError::new(
+                TunnelProblemCode::Conflict,
+                format!("tunnel {id} already has a live session on its control socket"),
+            ));
+        }
+        let _ = std::fs::remove_file(&socket);
+        Ok(())
+    }
+
     fn socket_alive(&self, id: &str, profile: &TunnelProfile) -> bool {
         let Some(control) = &self.control else {
             return false;
@@ -764,9 +790,12 @@ where
             s.last_error = None;
         })?;
 
-        if self.multiplexed {
-            let _ = std::fs::create_dir_all(&self.control_dir);
-        }
+        self.reclaim_socket(id, &profile)?;
+        append_log_line(
+            &self.log_dir,
+            id,
+            &format!("--- starting {} ---", self.clock.now_iso()),
+        );
         let control_path = self.handoff_control_path(id);
         let built = build_ssh_argv(
             &profile,
@@ -825,6 +854,14 @@ where
             && !exited_early;
         if !alive {
             self.live.remove(id);
+            // A master that died mid-startup may still have left its socket
+            // file; clear it while nothing answers behind it.
+            if self.multiplexed {
+                let socket = self.control_path_for(id);
+                if !self.socket_alive(id, &profile) {
+                    let _ = std::fs::remove_file(&socket);
+                }
+            }
             let needs_fail = self
                 .states
                 .get(id)
@@ -938,6 +975,19 @@ where
             s.pid = None;
             s.started_at = None;
         })?;
+        // The master is gone, so its socket file must go too — otherwise the
+        // next start finds a stale file and runs without multiplexing.
+        if self.multiplexed {
+            let socket = self.control_path_for(id);
+            if !self.socket_alive(id, &profile) {
+                let _ = std::fs::remove_file(&socket);
+            }
+        }
+        append_log_line(
+            &self.log_dir,
+            id,
+            &format!("--- stopped by user {} ---", self.clock.now_iso()),
+        );
         self.persist_runtime();
         self.states.get(id).cloned().ok_or_else(|| {
             TunnelError::new(TunnelProblemCode::InternalError, "state lost during stop")
@@ -1081,9 +1131,7 @@ where
     ) -> Result<ExternalSession> {
         self.ensure_loaded()?;
         let profile = self.get_profile(id)?;
-        if self.multiplexed {
-            let _ = std::fs::create_dir_all(&self.control_dir);
-        }
+        self.reclaim_socket(id, &profile)?;
         let control_path = self.handoff_control_path(id);
         let command = build_ssh_argv(
             &profile,
@@ -1284,11 +1332,13 @@ mod tests {
         }
     }
 
-    struct FakeControl;
+    struct FakeControl {
+        alive: bool,
+    }
 
     impl ControlPort for FakeControl {
         fn check(&self, _socket_path: &Path, _destination: &str) -> bool {
-            false
+            self.alive
         }
 
         fn exit(&self, _socket_path: &Path, _destination: &str) -> bool {
@@ -1336,6 +1386,28 @@ mod tests {
         FakeOpenUrl,
         FakeControl,
     > {
+        manager_in(
+            PathBuf::from("/tmp/ssh-tunnel-test-logs"),
+            PathBuf::from("/tmp/ssh-tunnel-test-control"),
+            false,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn manager_in(
+        log_dir: PathBuf,
+        control_dir: PathBuf,
+        socket_alive: bool,
+    ) -> Manager<
+        FakeProcess,
+        FakeProbe,
+        FakeStore,
+        FakeClock,
+        FakeRuntime,
+        FakeTerminal,
+        FakeOpenUrl,
+        FakeControl,
+    > {
         Manager::new(
             FakeProcess {
                 next_pid: 50000,
@@ -1349,9 +1421,11 @@ mod tests {
             FakeRuntime::default(),
             FakeTerminal,
             FakeOpenUrl,
-            Some(FakeControl),
-            PathBuf::from("/tmp/ssh-tunnel-test-logs"),
-            PathBuf::from("/tmp/ssh-tunnel-test-control"),
+            Some(FakeControl {
+                alive: socket_alive,
+            }),
+            log_dir,
+            control_dir,
             "ssh".into(),
         )
     }
@@ -1403,6 +1477,48 @@ mod tests {
         let hint = super::startup_failure_hint(&log).expect("a LAN failure must hint");
         assert!(hint.contains("Local Network"), "{hint}");
         std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn stale_socket_is_reclaimed_before_handoff() {
+        let base = std::env::temp_dir().join(format!("ssh-tunnel-reclaim-{}", std::process::id()));
+        let control_dir = base.join("control");
+        std::fs::create_dir_all(&control_dir).unwrap();
+        let mut manager = manager_in(base.join("logs"), control_dir.clone(), false);
+        let created = manager.create_profile(input()).unwrap();
+        // A dead master left its file behind; the socket answers nothing.
+        let socket = control_dir.join(format!("{}.sock", created.id));
+        std::fs::write(&socket, "stale").unwrap();
+        // reclaim_socket runs before the terminal launcher, so the handoff
+        // must get past it (and then fail on the fake terminal, proving the
+        // stale file was not the thing that stopped it).
+        let result = manager.launch_in_terminal(
+            &created.id,
+            "terminal",
+            crate::contract::LaunchMode::Tunnel,
+        );
+        assert!(!socket.exists(), "stale socket must be gone");
+        assert!(matches!(result, Err(e) if e.code == TunnelProblemCode::TerminalFailed));
+        std::fs::remove_dir_all(&base).unwrap();
+    }
+
+    #[test]
+    fn live_socket_is_never_stolen() {
+        let base = std::env::temp_dir().join(format!("ssh-tunnel-steal-{}", std::process::id()));
+        let control_dir = base.join("control");
+        std::fs::create_dir_all(&control_dir).unwrap();
+        let mut manager = manager_in(base.join("logs"), control_dir.clone(), true);
+        let created = manager.create_profile(input()).unwrap();
+        let socket = control_dir.join(format!("{}.sock", created.id));
+        std::fs::write(&socket, "live").unwrap();
+        let result = manager.launch_in_terminal(
+            &created.id,
+            "terminal",
+            crate::contract::LaunchMode::Tunnel,
+        );
+        assert!(matches!(result, Err(e) if e.code == TunnelProblemCode::Conflict));
+        assert!(socket.exists(), "a live socket must survive");
+        std::fs::remove_dir_all(&base).unwrap();
     }
 
     #[test]
