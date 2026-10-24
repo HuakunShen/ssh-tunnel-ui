@@ -1,14 +1,20 @@
-# Release: build the macOS app and publish it on a tag.
+# Release: build the desktop app for every supported platform and publish the
+# bundles on one GitHub Release.
 #
-# `v0.1.0` -> a GitHub Release with the .dmg and a .zip of the .app. A manual
-# run without a tag builds the same artifacts and leaves them as workflow
-# artifacts, so the build can be exercised without publishing anything.
+# `v0.1.3` -> one Release carrying
+#   SSH-Tunnel-0.1.3-macos-arm64.dmg / .zip
+#   SSH-Tunnel-0.1.3-macos-x64.dmg / .zip
+#   SSH-Tunnel-0.1.3-linux-x64.deb / .AppImage
+#   SSH-Tunnel-0.1.3-windows-x64-setup.exe
+# A manual run without a tag builds the same artifacts and keeps them as
+# workflow artifacts instead of publishing anything.
 #
-# The bundle is ad-hoc signed only (no Developer ID here), so a downloaded copy
-# carries the quarantine flag: right-click > Open the first time, or strip it
-# with `xattr -dr com.apple.quarantine`. Adding APPLE_CERTIFICATE,
+# macOS bundles are ad-hoc signed only (no Developer ID here), so a downloaded
+# copy carries the quarantine flag: right-click > Open the first time, or strip
+# it with `xattr -dr com.apple.quarantine`. Adding APPLE_CERTIFICATE,
 # APPLE_CERTIFICATE_PASSWORD, APPLE_SIGNING_IDENTITY and the notarization
-# secrets below would make the download open normally.
+# secrets below would make the download open normally. Windows installers are
+# unsigned for the same reason: SmartScreen shows "More info > Run anyway".
 name: release
 
 on:
@@ -19,9 +25,36 @@ on:
 permissions:
   contents: write
 
+env:
+  # One deployment floor for both macOS builds. Without it the x86_64 build
+  # inherits the SDK default and refuses to launch on the older systems its
+  # users are most likely to run.
+  MACOSX_DEPLOYMENT_TARGET: "11.0"
+
 jobs:
-  macos:
-    runs-on: macos-latest
+  bundle:
+    name: bundle — ${{ matrix.label }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: macos-arm64
+            os: macos-latest
+            args: --target aarch64-apple-darwin --bundles app,dmg
+            target: aarch64-apple-darwin
+          - label: macos-x64
+            os: macos-latest
+            args: --target x86_64-apple-darwin --bundles app,dmg
+            target: x86_64-apple-darwin
+          - label: linux-x64
+            os: ubuntu-22.04
+            args: --bundles deb,appimage
+            target: ""
+          - label: windows-x64
+            os: windows-latest
+            args: --bundles nsis
+            target: ""
     steps:
       - uses: actions/checkout@v4
         with:
@@ -38,9 +71,15 @@ jobs:
           node-version: 24
           cache: pnpm
 
+      - name: Linux WebView and packaging prerequisites
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
       - uses: dtolnay/rust-toolchain@stable
         with:
-          targets: aarch64-apple-darwin
+          targets: ${{ matrix.target }}
 
       - uses: Swatinem/rust-cache@v2
         with:
@@ -53,6 +92,17 @@ jobs:
       - name: Build the daemon, CLI, TUI and Web UI
         run: pnpm build
 
+      # Tag and bundle must agree: a `v0.1.3` tag that ships a 0.1.2 bundle is
+      # how the download ends up lying about itself.
+      - name: Stamp the bundle version from the tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: node scripts/set-app-version.mjs "$GITHUB_REF_NAME"
+
+      - name: Resolve the bundle version
+        shell: bash
+        run: echo "APP_VERSION=$(node scripts/app-version.mjs)" >> "$GITHUB_ENV"
+
       # Unsigned (ad-hoc) build. To sign and notarize, declare the secrets and
       # put these back on the step below: Tauri imports the certificate when the
       # variables exist, and an *empty* APPLE_CERTIFICATE makes it try (and
@@ -63,35 +113,55 @@ jobs:
       #
       # `pnpm run <script> -- ...` would hand the `--` to tauri, which then
       # forwards `--bundles` to cargo. Call the CLI directly instead.
-      - name: Build the app and its disk image
-        run: pnpm exec tauri build --bundles app,dmg
+      - name: Build the app and its installers
         working-directory: apps/desktop
+        shell: bash
+        run: pnpm exec tauri build ${{ matrix.args }}
 
-      - name: Archive the .app
+      - name: Collect the bundles into dist/
+        shell: bash
         run: |
-          cd apps/desktop/src-tauri/target/release/bundle/macos
+          node scripts/collect-bundles.mjs \
+            --label "${{ matrix.label }}" \
+            --version "$APP_VERSION" \
+            --target "${{ matrix.target }}" \
+            --out dist
+
+      # The .dmg is the friendly download; the .zip is the one that survives a
+      # browser that refuses a disk image, and it is what a script installs.
+      - name: Archive the .app as a zip
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          cd "apps/desktop/src-tauri/target/${{ matrix.target }}/release/bundle/macos"
           ditto -c -k --sequesterRsrc --keepParent "SSH Tunnel.app" \
-            "$GITHUB_WORKSPACE/SSH-Tunnel-macos-arm64.zip"
+            "$GITHUB_WORKSPACE/dist/SSH-Tunnel-${APP_VERSION}-${{ matrix.label }}.zip"
 
-      - name: Collect the disk image
-        run: |
-          cp apps/desktop/src-tauri/target/release/bundle/dmg/*.dmg \
-            "$GITHUB_WORKSPACE/SSH-Tunnel-macos-arm64.dmg"
-
-      - name: Publish the release
-        if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v2
-        with:
-          files: |
-            SSH-Tunnel-macos-arm64.dmg
-            SSH-Tunnel-macos-arm64.zip
-          generate_release_notes: true
-
-      - name: Keep the artifacts of a manual run
-        if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+      - name: Keep this platform's artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: SSH-Tunnel-macos-arm64
-          path: |
-            SSH-Tunnel-macos-arm64.dmg
-            SSH-Tunnel-macos-arm64.zip
+          name: SSH-Tunnel-${{ matrix.label }}
+          path: dist/*
+          if-no-files-found: error
+
+  publish:
+    name: publish the release
+    needs: bundle
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      # One release, every platform: each bundle job uploads to the same tag, so
+      # the download page lists arm64 and x64 side by side instead of two
+      # releases fighting over one name.
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: List what will be published
+        run: ls -l dist
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true

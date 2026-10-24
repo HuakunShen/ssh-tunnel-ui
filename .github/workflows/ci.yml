@@ -49,3 +49,49 @@ jobs:
 
       - name: Tests
         run: pnpm test:ci
+
+  # The release builds the shell on three operating systems; if one of them
+  # stops compiling, a tag is the worst place to find out. `cargo check` is the
+  # cheap half of `tauri build` — it never links a bundle, but it compiles every
+  # `#[cfg]` branch this host can reach.
+  desktop:
+    name: shell — ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-22.04, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Linux WebView prerequisites
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/desktop/src-tauri
+
+      # `generate_context!` only requires the `frontendDist` path to exist, so a
+      # stub stands in for the real Web UI here: the release job builds it.
+      - name: Stub the frontend dist
+        shell: bash
+        run: |
+          mkdir -p apps/web/dist
+          echo '<!doctype html>' > apps/web/dist/index.html
+
+      - name: Check the shell
+        working-directory: apps/desktop/src-tauri
+        run: cargo check --workspace
+
+      - name: Shell unit tests (macOS only: the window material is macOS code)
+        if: runner.os == 'macOS'
+        working-directory: apps/desktop/src-tauri
+        run: cargo test
+

@@ -7,13 +7,31 @@ A one-click SSH tunnel manager: remember every tunnel, start/stop with a keypres
 
 ## Install
 
-Download `SSH-Tunnel-macos-arm64.dmg` from
-[Releases](https://github.com/HuakunShen/ssh-tunnel-ui/releases) and drag the app
-to Applications. The build is ad-hoc signed, not notarized, so the first launch
-needs right-click > Open (or `xattr -dr com.apple.quarantine "/Applications/SSH Tunnel.app"`).
+Every release ships the same app for four platforms
+([Releases](https://github.com/HuakunShen/ssh-tunnel-ui/releases)):
 
-The app carries its own daemon, the Web UI and the icon: once copied it runs
-without this repository next to it.
+| Platform | Artifact | Notes |
+|---|---|---|
+| macOS, Apple silicon | `SSH-Tunnel-<version>-macos-arm64.dmg` / `.zip` | drag to Applications |
+| macOS, Intel | `SSH-Tunnel-<version>-macos-x64.dmg` / `.zip` | back to macOS 11 |
+| Windows, x64 | `SSH-Tunnel-<version>-windows-x64-setup.exe` | NSIS installer |
+| Linux, x64 | `SSH-Tunnel-<version>-linux-x64.deb` / `.AppImage` | needs WebKitGTK 4.1 |
+
+The macOS builds are ad-hoc signed, not notarized, so the first launch needs
+right-click > Open (or `xattr -dr com.apple.quarantine "/Applications/SSH Tunnel.app"`).
+The Windows installer is unsigned, so SmartScreen offers "More info" > "Run
+anyway".
+
+The app carries its own daemon and Web UI, but runs the daemon through `node`
+(v20 or newer) because it is a TypeScript backend: the shell looks for `node` on
+`PATH`, then in the places a per-user install hides (the login shell on
+macOS/Linux, `Program Files`, Volta and nvm-windows on Windows). On macOS, keep
+`ssh`'s own config it already reads.
+
+Windows note: OpenSSH there has no `ControlMaster`, so a tunnel started in the
+app is owned by its process id rather than by a control socket. Everything the
+UI does still works; only the "someone else's terminal holds it" detection falls
+back to probing the forwarded port.
 
 Tunnels keep running when you quit the app: the daemon and its `ssh` children
 are detached on purpose. The daemon also writes which tunnels were up to
@@ -134,10 +152,15 @@ assertions fail locally and in CI; `pnpm test:ci` (what CI runs) excludes
 
 ## Releases
 
-`git tag v0.1.0 && git push origin v0.1.0` builds the daemon, the Web UI and the
-Tauri shell on a macOS runner, then attaches a `.dmg` and a `.zip` to a GitHub
-Release. A manual run of the workflow builds the same artifacts without
-publishing them. Signing and notarization turn on by adding `APPLE_CERTIFICATE`,
+`git tag v0.1.3 && git push origin v0.1.3` builds the daemon, the Web UI and the
+Tauri shell on macOS (arm64 and x86_64), Windows and Linux runners, then
+attaches every bundle to **one** GitHub Release: two `.dmg`/`.zip` pairs, an NSIS
+installer and a `.deb` plus `.AppImage`. A manual run of the workflow builds the
+same artifacts without publishing them.
+
+The tag is the version: the workflow stamps `tauri.conf.json` from
+`GITHUB_REF_NAME` before building, so an artifact never claims a version the
+tag does not. Signing and notarization turn on by adding `APPLE_CERTIFICATE`,
 `APPLE_CERTIFICATE_PASSWORD`, `APPLE_SIGNING_IDENTITY`, `APPLE_ID`,
 `APPLE_PASSWORD` and `APPLE_TEAM_ID` as repository secrets.
 

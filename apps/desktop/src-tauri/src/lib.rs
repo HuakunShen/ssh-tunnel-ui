@@ -110,6 +110,16 @@ fn wait_for_daemon(deadline: Duration) -> bool {
     health_ok()
 }
 
+/// File names a node interpreter can have on this host.
+///
+/// Windows stores executables with a `PATHEXT` suffix, so `node` alone never
+/// matches `node.exe` there — and `Command::new` would happily launch it after
+/// this check had already declared node missing.
+#[cfg(windows)]
+const NODE_NAMES: &[&str] = &["node.exe", "node.cmd", "node"];
+#[cfg(not(windows))]
+const NODE_NAMES: &[&str] = &["node"];
+
 /// A `node` found by walking `PATH`, without starting a shell.
 fn node_on_path() -> Option<PathBuf> {
     node_in_path(&std::env::var_os("PATH")?)
@@ -118,9 +128,33 @@ fn node_on_path() -> Option<PathBuf> {
 /// Same lookup against an explicit `PATH` value, so it is testable without
 /// mutating the process environment the other tests share.
 fn node_in_path(path: &std::ffi::OsStr) -> Option<PathBuf> {
-    std::env::split_paths(path)
-        .map(|dir| dir.join("node"))
-        .find(|candidate| candidate.is_file())
+    for dir in std::env::split_paths(path) {
+        for name in NODE_NAMES {
+            let candidate = dir.join(name);
+            if candidate.is_file() {
+                return Some(candidate);
+            }
+        }
+    }
+    None
+}
+
+/// Last resort when `node` is not on the `PATH` this app inherited.
+///
+/// macOS keeps a separate answer per platform: a GUI app started by Finder sees
+/// `PATH=/usr/bin:/bin:/usr/sbin:/sbin`, and a Windows app started from the
+/// Start menu sees the machine `PATH`, which a per-user Node install never
+/// touches. The returned `Option<String>` is a `PATH` to apply to the daemon
+/// when the probe also learned one.
+fn fallback_node() -> Option<(PathBuf, Option<String>)> {
+    #[cfg(unix)]
+    {
+        login_shell_probe().map(|(node, path)| (node, Some(path)))
+    }
+    #[cfg(windows)]
+    {
+        windows_node_candidates()
+    }
 }
 
 /// Ask the user's login shell where `node` is and what `PATH` it exports.
@@ -130,6 +164,7 @@ fn node_in_path(path: &std::ffi::OsStr) -> Option<PathBuf> {
 /// keg-only Homebrew prefix. The login shell is the only source that agrees
 /// with the terminal the user actually runs — and its `PATH` is also what makes
 /// the daemon find the same `ssh` they do.
+#[cfg(unix)]
 fn login_shell_probe() -> Option<(PathBuf, String)> {
     let shell = std::env::var("SHELL")
         .ok()
@@ -144,6 +179,10 @@ fn login_shell_probe() -> Option<(PathBuf, String)> {
 }
 
 /// Read `command -v node` + `printenv PATH` output into an interpreter and PATH.
+///
+/// Only the POSIX probe produces this output; the tests pin the parser on every
+/// platform, so it stays compiled for them.
+#[cfg(any(unix, test))]
 fn parse_shell_probe(stdout: &str) -> Option<(PathBuf, String)> {
     let mut lines = stdout.lines().map(str::trim).filter(|line| !line.is_empty());
     let node = lines.next()?;
@@ -152,6 +191,47 @@ fn parse_shell_probe(stdout: &str) -> Option<(PathBuf, String)> {
     }
     let path = lines.next()?;
     Some((PathBuf::from(node), path.to_string()))
+}
+
+/// Where a Windows machine keeps `node` when the inherited `PATH` misses it.
+///
+/// The official installer writes into `Program Files`, Volta and nvm-windows
+/// each use a per-user directory, and none of those reach a process started
+/// from the shell's system `PATH`. Directories are probed, never executed.
+#[cfg(windows)]
+fn windows_node_candidates() -> Option<(PathBuf, Option<String>)> {
+    let mut dirs: Vec<PathBuf> = Vec::new();
+    for key in ["ProgramFiles", "ProgramFiles(x86)"] {
+        if let Some(base) = std::env::var_os(key) {
+            dirs.push(PathBuf::from(base).join("nodejs"));
+        }
+    }
+    if let Some(local) = std::env::var_os("LOCALAPPDATA") {
+        dirs.push(PathBuf::from(&local).join("Programs").join("nodejs"));
+        dirs.push(PathBuf::from(&local).join("Volta").join("bin"));
+    }
+    for dir in &dirs {
+        for name in NODE_NAMES {
+            let candidate = dir.join(name);
+            if candidate.is_file() {
+                return Some((candidate, None));
+            }
+        }
+    }
+    // nvm-windows keeps one directory per installed version.
+    if let Some(appdata) = std::env::var_os("APPDATA") {
+        if let Ok(entries) = std::fs::read_dir(PathBuf::from(appdata).join("nvm")) {
+            for entry in entries.flatten() {
+                for name in NODE_NAMES {
+                    let candidate = entry.path().join(name);
+                    if candidate.is_file() {
+                        return Some((candidate, None));
+                    }
+                }
+            }
+        }
+    }
+    None
 }
 
 fn spawn_sidecar(app: &tauri::AppHandle) -> Result<(), String> {
@@ -163,18 +243,19 @@ fn spawn_sidecar(app: &tauri::AppHandle) -> Result<(), String> {
     // The daemon ships as a bundled ESM file: run it through node when the
     // resource is a `.mjs`, execute directly when it is a native binary.
     let is_node_script = binary.extension().and_then(|e| e.to_str()) == Some("mjs");
-    let mut probe: Option<(PathBuf, String)> = None;
+    let mut probe: Option<(PathBuf, Option<String>)> = None;
     let program = if is_node_script {
         match node_on_path() {
             Some(node) => node,
             None => {
-                // Not on the inherited PATH: ask the login shell, exactly like
-                // the terminal the user would have started the daemon from.
-                probe = login_shell_probe();
+                // Not on the inherited PATH: probe the host-specific places,
+                // exactly like the terminal the user would have started the
+                // daemon from.
+                probe = fallback_node();
                 probe
                     .as_ref()
                     .map(|(node, _)| node.clone())
-                    .unwrap_or_else(|| PathBuf::from("node"))
+                    .unwrap_or_else(|| PathBuf::from(NODE_NAMES[0]))
             }
         }
     } else {
@@ -184,7 +265,7 @@ fn spawn_sidecar(app: &tauri::AppHandle) -> Result<(), String> {
     if is_node_script {
         command.arg(&binary);
     }
-    if let Some((_, path)) = &probe {
+    if let Some((_, Some(path))) = &probe {
         command.env("PATH", path);
     }
     command
@@ -311,15 +392,15 @@ mod tests {
     #[test]
     fn node_in_path_finds_the_executable_and_ignores_a_directory() {
         let dir = std::env::temp_dir().join(format!("ssh-tunnel-path-{}", std::process::id()));
-        let fake = dir.join("node");
+        let fake = dir.join(NODE_NAMES[0]);
         fs::create_dir_all(&fake).unwrap();
         let empty = dir.join("empty");
         fs::create_dir_all(&empty).unwrap();
         // A directory named `node` is not an interpreter.
         assert_eq!(node_in_path(empty.as_os_str()), None);
         fs::remove_dir(&fake).unwrap();
-        fs::write(dir.join("node"), "#!/bin/sh\n").unwrap();
-        assert_eq!(node_in_path(dir.as_os_str()), Some(dir.join("node")));
+        fs::write(dir.join(NODE_NAMES[0]), "#!/bin/sh\n").unwrap();
+        assert_eq!(node_in_path(dir.as_os_str()), Some(dir.join(NODE_NAMES[0])));
         fs::remove_dir_all(&dir).unwrap();
     }
 
