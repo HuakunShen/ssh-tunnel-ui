@@ -28,15 +28,21 @@ const SUFFIX = {
 };
 
 /**
- * Updater archives, matched by filename tail (their extensions alone — `.gz`,
- * `.zip` — are too generic to key on). Renaming is safe: the `.sig` signs the
- * file bytes, never the name, and `latest.json` points at the renamed files.
- * Each entry maps a filename tail to the release-name suffix.
+ * Updater payloads, matched by filename tail. Only macOS wraps its bundle
+ * (`.app.tar.gz`); the v2 updater installs AppImage, deb, nsis and msi
+ * directly, so those entries ARE the installer files (byte-identical to the
+ * friendly downloads — copied twice under two names would be waste, see
+ * below). Renaming is safe: the `.sig` signs the file bytes, never the name,
+ * and `latest.json` points at the renamed files.
+ *
+ * Each entry maps a filename tail to the release-name suffix. Single-file
+ * payloads whose friendly name already matches (`-setup.exe`, `.AppImage`)
+ * are collected once, under the friendly name, and the feed points there.
  */
 const UPDATER = [
   [".app.tar.gz", ".app.tar.gz"],
-  [".AppImage.tar.gz", ".AppImage.tar.gz"],
-  ["-setup.nsis.zip", "-setup.nsis.zip"],
+  [".AppImage", ".AppImage"],
+  ["-setup.exe", "-setup.exe"],
 ];
 
 function updaterName(file) {
@@ -104,17 +110,16 @@ for (const path of walk(bundleRoot)) {
   const file = basename(path);
   const updateSuffix = updaterName(file);
   if (updateSuffix !== undefined) {
-    // Updater archives ride along only when the build signed them: without
-    // the key there is a tarball but no `.sig`, and an unsigned update feed
-    // is worse than none.
-    const sig = updateSuffix.endsWith(".sig")
-      ? path
-      : `${path}.sig`;
-    if (!existsSync(sig)) continue;
-    const name = `TunnelDeck-${version}-${label}${updateSuffix}`;
-    copyFileSync(path, join(outDir, name));
-    copied.push(name);
-    continue;
+    // The updater payload rides along only when the build signed it: without
+    // the key there is a binary but no `.sig`, and an unsigned update feed
+    // is worse than none. (The friendly download below is unaffected — it
+    // never needs a signature.)
+    const sig = updateSuffix.endsWith(".sig") ? path : `${path}.sig`;
+    if (existsSync(sig)) {
+      const name = `TunnelDeck-${version}-${label}${updateSuffix}`;
+      copyFileSync(path, join(outDir, name));
+      copied.push(name);
+    }
   }
   const suffix = SUFFIX[extname(path).toLowerCase()];
   if (suffix === undefined) continue;

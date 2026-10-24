@@ -23,12 +23,17 @@ function arg(name, fallback) {
   return process.argv[index + 1];
 }
 
-/** Release label → the platform key the updater client sends. */
+/**
+ * Release label → the platform key the updater client sends, plus the asset
+ * tail. Only macOS wraps its bundle (`.app.tar.gz`); the v2 updater installs
+ * AppImage and the nsis `.exe` directly, so those feed entries ARE the
+ * friendly downloads.
+ */
 const PLATFORM = {
   "macos-arm64": ["darwin-aarch64", ".app.tar.gz"],
   "macos-x64": ["darwin-x86_64", ".app.tar.gz"],
-  "linux-x64": ["linux-x86_64", ".AppImage.tar.gz"],
-  "windows-x64": ["windows-x86_64", "-setup.nsis.zip"],
+  "linux-x64": ["linux-x86_64", ".AppImage"],
+  "windows-x64": ["windows-x86_64", "-setup.exe"],
 };
 
 const tag = arg("tag");
@@ -59,6 +64,18 @@ const keys = Object.keys(platforms);
 if (keys.length === 0) {
   console.error("[updater] no signed platform archive found; refusing to write an empty feed");
   process.exit(1);
+}
+// A tagged release must feed every platform: a missing entry does not read
+// as "no update", it strands those users on the old version with no error.
+// Manual runs stay lenient (`--strict` off) for probing single platforms.
+if (process.argv.includes("--strict")) {
+  const missing = Object.values(PLATFORM)
+    .map(([platform]) => platform)
+    .filter((platform) => !keys.includes(platform));
+  if (missing.length > 0) {
+    console.error(`[updater] feed incomplete, missing: ${missing.join(", ")}`);
+    process.exit(1);
+  }
 }
 writeFileSync(
   out,

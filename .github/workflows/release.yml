@@ -173,8 +173,9 @@ jobs:
 
       # The updater feed points at the release assets by exact name, so it is
       # rendered here — after every platform landed — and never by hand.
+      # `--strict`: a feed missing a platform strands those users silently.
       - name: Render the updater feed
-        run: node scripts/render-updater-json.mjs --tag "$GITHUB_REF_NAME" --dir dist
+        run: node scripts/render-updater-json.mjs --tag "$GITHUB_REF_NAME" --dir dist --strict
 
       - uses: softprops/action-gh-release@v2
         with:
