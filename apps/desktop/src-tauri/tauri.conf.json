@@ -48,6 +48,9 @@
     "resources": [
       "../../server/dist/server.mjs",
       "../../web/dist"
-    ]
+    ],
+    "macOS": {
+      "signingIdentity": "-"
+    }
   }
 }
