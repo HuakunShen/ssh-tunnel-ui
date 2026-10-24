@@ -14,6 +14,7 @@
     Link,
     Pencil,
     Play,
+    ScrollText,
     Terminal as TerminalIcon,
     Trash,
   } from "@lucide/svelte";
@@ -36,6 +37,7 @@
     onProbe: (id: string) => void;
     onCopy: (id: string) => void;
     onLaunch: (id: string, terminalId: string, mode: LaunchMode) => void;
+    onLog: (id: string) => void;
     onEdit: (profile: TunnelProfile) => void;
     onDelete: (id: string, name: string) => void;
   }
@@ -50,6 +52,7 @@
     onProbe,
     onCopy,
     onLaunch,
+    onLog,
     onEdit,
     onDelete,
   }: Props = $props();
@@ -189,9 +192,19 @@
       {/each}
     </div>
     {#if openError !== undefined}
-      <p class="mt-1 truncate text-[10px] text-destructive" title={openError}>{openError}</p>
+      <div class="mt-1 flex items-center gap-2">
+        <p class="truncate text-[10px] text-destructive" title={openError}>{openError}</p>
+        <button class="shrink-0 text-[10px] text-muted-foreground underline hover:text-foreground" onclick={() => onLog(profile.id)}>
+          log
+        </button>
+      </div>
     {:else if tunnelState?.lastError}
-      <p class="mt-1 truncate text-[10px] text-destructive" title={tunnelState.lastError}>{tunnelState.lastError}</p>
+      <div class="mt-1 flex items-center gap-2">
+        <p class="truncate text-[10px] text-destructive" title={tunnelState.lastError}>{tunnelState.lastError}</p>
+        <button class="shrink-0 text-[10px] text-muted-foreground underline hover:text-foreground" onclick={() => onLog(profile.id)}>
+          log
+        </button>
+      </div>
     {/if}
   </div>
 
@@ -285,6 +298,15 @@
         </div>
       {/if}
     </div>
+
+    <button
+      class="toolbar-icon"
+      onclick={() => onLog(profile.id)}
+      title="View this tunnel's log"
+      aria-label="View log"
+    >
+      <ScrollText size={14} />
+    </button>
 
     <button class="toolbar-icon" onclick={() => onEdit(profile)} title="Edit" aria-label="Edit tunnel">
       <Pencil size={14} />

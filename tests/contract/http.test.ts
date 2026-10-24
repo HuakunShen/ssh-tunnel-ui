@@ -457,6 +457,41 @@ describe("daemon API", () => {
       expect(problem.message).toContain("-10004");
     });
 
+    it("serves the tail of a tunnel's log and keeps the path", async () => {
+      const created = await post(app, "/api/profiles", INPUT);
+      const id = (created.json as { id: string }).id;
+      const dir = "/tmp/ssh-tunnel-test-logs";
+      mkdirSync(dir, { recursive: true });
+      const logPath = join(dir, `${id}.log`);
+      writeFileSync(logPath, "line one\nline two\nline three\n");
+
+      const result = await get(app, `/api/profiles/${id}/log?tail=2`);
+      expect(result.status).toBe(200);
+      const body = result.json as {
+        path: string;
+        lines: string[];
+        truncated: boolean;
+        bytes: number;
+      };
+      expect(body.path).toBe(logPath);
+      expect(body.lines).toEqual(["line two", "line three"]);
+      expect(body.truncated).toBe(true);
+      expect(body.bytes).toBeGreaterThan(0);
+    });
+
+    it("returns an empty tail instead of failing when a tunnel never logged", async () => {
+      const created = await post(app, "/api/profiles", INPUT);
+      const id = (created.json as { id: string }).id;
+      const result = await get(app, `/api/profiles/${id}/log`);
+      expect(result.status).toBe(200);
+      expect((result.json as { lines: string[] }).lines).toEqual([]);
+    });
+
+    it("rejects a log request for an unknown profile with NotFound (404)", async () => {
+      const result = await get(app, "/api/profiles/t-ghost/log");
+      expect(result.status).toBe(404);
+    });
+
     it("rejects an uninstalled terminal with NotFound (404)", async () => {
       const created = await post(app, "/api/profiles", INPUT);
       const id = (created.json as { id: string }).id;

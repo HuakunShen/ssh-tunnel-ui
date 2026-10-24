@@ -92,7 +92,7 @@ usage:
   const client = direct ? null : createTunnelClient({ baseUrl: daemonBase(), fetch });
   const manager = direct ? await directManager() : null;
 
-  const needId = ["show", "preview", "start", "stop", "probe", "delete"].includes(command);
+  const needId = ["show", "preview", "logs", "start", "stop", "probe", "delete"].includes(command);
   if (needId && target === undefined) {
     console.error(`usage: ssh-tunnel ${command} <id>`);
     process.exitCode = 1;
@@ -148,6 +148,22 @@ usage:
           const result = await client?.preview(target as string);
           console.log(result?.command ?? "");
         }
+        break;
+      }
+      case "logs": {
+        const tail = Number(flagValue("tail") ?? "200");
+        const count = Number.isFinite(tail) ? Math.min(2000, Math.max(1, Math.trunc(tail))) : 200;
+        const log =
+          manager !== null
+            ? await manager.logTail(target as string, count)
+            : await client?.getLog(target as string, count);
+        if (log === undefined) {
+          console.error("no daemon answered");
+          process.exitCode = 1;
+          return;
+        }
+        console.error(`${log.path} (${log.bytes} bytes${log.truncated ? ", tail" : ""})`);
+        for (const line of log.lines) console.log(line);
         break;
       }
       case "start": {

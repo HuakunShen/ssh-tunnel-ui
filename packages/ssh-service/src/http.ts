@@ -14,6 +14,7 @@ import {
   launchResponseSchema,
   openUrlRequestSchema,
   openUrlResponseSchema,
+  logTailResponseSchema,
   previewResponseSchema,
   profileInputSchema,
   profileListResponseSchema,
@@ -131,6 +132,21 @@ export function createServiceApp(context: ServiceContext): Hono {
     try {
       await context.manager.deleteProfile(c.req.param("id"));
       return c.json({ ok: true });
+    } catch (error) {
+      return toResponse(error);
+    }
+  });
+
+  app.get("/api/profiles/:id/log", async (c) => {
+    try {
+      const raw = Number(c.req.query("tail") ?? "200");
+      const tail = Number.isFinite(raw) ? Math.min(2000, Math.max(1, Math.trunc(raw))) : 200;
+      const log = await context.manager.logTail(c.req.param("id"), tail);
+      const checked = logTailResponseSchema.safeParse(log);
+      if (!checked.success) {
+        return toResponse(new TunnelError("InternalError", "log shape drifted"));
+      }
+      return c.json(checked.data);
     } catch (error) {
       return toResponse(error);
     }

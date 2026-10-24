@@ -123,6 +123,8 @@ node apps/server/dist/server.mjs --port=7432 --web-dir=apps/web/dist
 node apps/tui/dist/tui.mjs
 # CLI (daemon mode default, `--direct` embeds the manager)
 node apps/cli/dist/cli.mjs list
+# a tunnel's own log, without opening a file manager
+node apps/cli/dist/cli.mjs logs <id> --tail=200
 ```
 
 `pnpm test` also runs the TUI snapshot tests, which need OpenTUI's native

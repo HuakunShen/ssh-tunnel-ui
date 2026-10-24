@@ -9,6 +9,7 @@ import {
   tunnelProfileSchema,
   type ForwardHealth,
   type LaunchMode,
+  type LogTail,
   type TunnelProfile,
   type TunnelProfileInput,
   type TunnelState,
@@ -38,7 +39,7 @@ import type {
   TerminalPort,
   TerminalTargetInfo,
 } from "@ssh-tunnel/host-node";
-import { existsSync, mkdirSync } from "node:fs";
+import { closeSync, existsSync, mkdirSync, openSync, readSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
@@ -770,6 +771,60 @@ export class TunnelManager {
       throw new TunnelError("InternalError", "state lost during probe");
     }
     return updated;
+  }
+
+  /**
+   * The tail of this tunnel's log file, already split into lines.
+   *
+   * Reading from the end rather than the whole file keeps a daemon that has
+   * been running for weeks from dragging megabytes into a dialog: at most
+   * 128 KiB is read, and only the last `tail` lines survive. A missing file is
+   * not an error — a tunnel that never started has no log yet.
+   */
+  async logTail(id: string, tail = 200): Promise<LogTail> {
+    await this.ensureLoaded();
+    if (!this.profiles.has(id)) {
+      throw new TunnelError("NotFound", `no profile ${id}`, { details: { profileId: id } });
+    }
+    const path = join(this.logDir, `${id}.log`);
+    let size = 0;
+    try {
+      size = statSync(path).size;
+    } catch {
+      return { profileId: id, path, lines: [], truncated: false, bytes: 0 };
+    }
+    if (size === 0) return { profileId: id, path, lines: [], truncated: false, bytes: 0 };
+    const window = 128 * 1024;
+    const start = Math.max(0, size - window);
+    const length = size - start;
+    const buffer = Buffer.alloc(length);
+    let read = 0;
+    try {
+      const fd = openSync(path, "r");
+      try {
+        read = readSync(fd, buffer, 0, length, start);
+      } finally {
+        closeSync(fd);
+      }
+    } catch {
+      return { profileId: id, path, lines: [], truncated: false, bytes: size };
+    }
+    let text = buffer.toString("utf8", 0, read);
+    // A windowed read almost always starts mid-line; drop that fragment.
+    if (start > 0) {
+      const firstBreak = text.indexOf("\n");
+      text = firstBreak === -1 ? "" : text.slice(firstBreak + 1);
+    }
+    const all = text.split("\n");
+    if (all.length > 0 && all[all.length - 1] === "") all.pop();
+    const lines = all.slice(Math.max(0, all.length - tail));
+    return {
+      profileId: id,
+      path,
+      lines,
+      truncated: start > 0 || all.length > lines.length,
+      bytes: size,
+    };
   }
 
   preview(id: string): { readonly argv: readonly string[]; readonly command: string };

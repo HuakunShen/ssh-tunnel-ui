@@ -209,6 +209,21 @@ export const hostListResponseSchema = z.strictObject({
   hosts: z.array(sshHostInfoSchema),
 });
 
+/**
+ * The tail of a tunnel's own log. The daemon reads it from its log directory;
+ * the absolute path travels with the lines so a front can say where it lives
+ * without guessing, and `truncated` says whether older output was dropped.
+ */
+export const logTailResponseSchema = z.strictObject({
+  profileId: z.string().min(1).max(64),
+  path: z.string().min(1).max(2048),
+  lines: z.array(z.string().max(4000)).max(2000),
+  truncated: z.boolean(),
+  bytes: z.number().int().nonnegative(),
+});
+
+export type LogTail = z.infer<typeof logTailResponseSchema>;
+
 export const previewResponseSchema = z.strictObject({
   profileId: z.string().min(1).max(64),
   argv: z.array(z.string()),

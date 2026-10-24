@@ -10,6 +10,7 @@ export const TUNNEL_ROUTES = {
   updateProfile: { method: "PUT", path: "/api/profiles/:id" },
   deleteProfile: { method: "DELETE", path: "/api/profiles/:id" },
   previewProfile: { method: "GET", path: "/api/profiles/:id/preview" },
+  profileLog: { method: "GET", path: "/api/profiles/:id/log" },
   listStates: { method: "GET", path: "/api/states" },
   getState: { method: "GET", path: "/api/states/:id" },
   startTunnel: { method: "POST", path: "/api/states/:id/start" },
@@ -30,6 +31,11 @@ export function profilePath(id: string): string {
 
 export function previewPath(id: string): string {
   return `/api/profiles/${encodeURIComponent(id)}/preview`;
+}
+
+export function logPath(id: string, tail?: number): string {
+  const base = `/api/profiles/${encodeURIComponent(id)}/log`;
+  return tail === undefined ? base : `${base}?tail=${tail}`;
 }
 
 export function statePath(id: string): string {

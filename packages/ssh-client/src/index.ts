@@ -9,6 +9,7 @@ import {
   hostListResponseSchema,
   isTunnelProblem,
   launchResponseSchema,
+  logTailResponseSchema,
   openUrlResponseSchema,
   previewResponseSchema,
   profileListResponseSchema,
@@ -18,6 +19,7 @@ import {
   tunnelStateSchema,
   TunnelError,
   type LaunchMode,
+  type LogTail,
   type SshHostInfo,
   type TerminalTarget,
   type TunnelProblemCode,
@@ -25,6 +27,7 @@ import {
   type TunnelProfileInput,
   type TunnelState,
   launchPath,
+  logPath,
   previewPath,
   probePath,
   profilePath,
@@ -105,6 +108,7 @@ export function createTunnelClient(options: TunnelClientOptions): {
   getProfile(id: string): Promise<TunnelProfile>;
   updateProfile(id: string, input: TunnelProfileInput): Promise<TunnelProfile>;
   deleteProfile(id: string): Promise<void>;
+  getLog(id: string, tail?: number): Promise<LogTail>;
   preview(id: string): Promise<{ profileId: string; argv: string[]; command: string }>;
   listStates(): Promise<readonly TunnelState[]>;
   getState(id: string): Promise<TunnelState>;
@@ -181,6 +185,10 @@ export function createTunnelClient(options: TunnelClientOptions): {
     listTerminals: () =>
       request(options, "GET", "/api/terminals", (body) =>
         must(terminalListResponseSchema.loose().safeParse(body)).terminals,
+      ),
+    getLog: (id, tail) =>
+      request(options, "GET", logPath(id, tail), (body) =>
+        must(logTailResponseSchema.loose().safeParse(body)),
       ),
     launchInTerminal: (id, terminalId, mode) =>
       request(options, "POST", launchPath(id), (body) =>

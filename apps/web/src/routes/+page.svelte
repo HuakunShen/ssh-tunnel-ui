@@ -16,6 +16,7 @@
     WifiOff,
   } from "@lucide/svelte";
   import TunnelRow from "$lib/TunnelRow.svelte";
+  import LogSheet from "$lib/LogSheet.svelte";
   import SettingsSheet from "$lib/SettingsSheet.svelte";
   import TunnelEditor from "$lib/TunnelEditor.svelte";
   import {
@@ -32,6 +33,8 @@
 
   let store = $state({ ...initialStore });
   let editorOpen = $state(false);
+  let logOpen = $state(false);
+  let logProfile = $state<TunnelProfile | null>(null);
   let settingsOpen = $state(false);
   // One knob for the whole window: the daemon has no opinion about appearance,
   // so this is a page preference kept in localStorage.
@@ -182,6 +185,13 @@
     } catch (e) {
       store = { ...store, lastError: e instanceof Error ? e.message : "copy failed" };
     }
+  }
+
+  function openLog(id: string): void {
+    const profile = store.profiles.find((candidate) => candidate.id === id);
+    if (profile === undefined) return;
+    logProfile = profile;
+    logOpen = true;
   }
 
   async function launch(id: string, terminalId: string, mode: LaunchMode): Promise<void> {
@@ -348,6 +358,7 @@
               onProbe={(id) => act(id, "probed", () => getClient().probe(id))}
               onCopy={(id) => void copyCommand(id)}
               onLaunch={launch}
+              onLog={openLog}
               onEdit={openEdit}
               onDelete={deleteProfile}
             />
@@ -384,6 +395,8 @@
   onOpacity={applyOpacity}
   onClose={() => (settingsOpen = false)}
 />
+
+<LogSheet open={logOpen} profile={logProfile} onClose={() => (logOpen = false)} />
 
 <TunnelEditor
   open={editorOpen}

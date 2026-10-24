@@ -9,6 +9,7 @@
 import { createTunnelClient, type TunnelClient } from "@ssh-tunnel/client";
 import type {
   LaunchMode,
+  LogTail,
   SshHostInfo,
   TerminalTarget,
   TunnelProfile,
@@ -18,6 +19,7 @@ import type {
 
 export type {
   LaunchMode,
+  LogTail,
   TunnelProfile,
   TunnelProfileInput,
   TunnelState,
