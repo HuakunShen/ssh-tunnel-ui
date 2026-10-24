@@ -14,10 +14,25 @@
  * status poll.
  */
 import { spawn } from "node:child_process";
+import { platform } from "node:os";
 import type { ControlPort } from "./ports.js";
 
 /** How long `ssh -O` may take before the socket is treated as gone. */
 const CONTROL_TIMEOUT_MS = 2_000;
+
+/**
+ * Can this host's OpenSSH multiplex sessions at all?
+ *
+ * The Windows build of ssh has no `ControlMaster`: passing the option does not
+ * create a socket, so nothing can be checked or ended through one. Callers ask
+ * this before building a command line, so the same profile yields something
+ * that actually works instead of a quietly inert option.
+ */
+export function supportsControlMaster(
+  hostPlatform: NodeJS.Platform = platform(),
+): boolean {
+  return hostPlatform !== "win32";
+}
 
 function runControl(
   sshPath: string,

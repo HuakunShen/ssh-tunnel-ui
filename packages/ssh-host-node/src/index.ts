@@ -9,6 +9,7 @@ export * from "./process.js";
 export * from "./probe.js";
 export * from "./store.js";
 export * from "./ssh-config.js";
+export * from "./which.js";
 export * from "./terminal.js";
 export * from "./control.js";
 export * from "./runtime-store.js";

@@ -24,13 +24,13 @@ import {
   openSync,
   readFileSync,
   readdirSync,
-  statSync,
   unlinkSync,
 } from "node:fs";
 import { join } from "node:path";
 import { homedir, platform, tmpdir } from "node:os";
 import type { LaunchMode } from "@ssh-tunnel/contract";
 import type { TerminalPort, TerminalTargetInfo } from "./ports.js";
+import { whichOnPath } from "./which.js";
 
 /** A terminal the daemon knows how to launch with a single command. */
 interface TerminalTarget extends TerminalTargetInfo {
@@ -50,19 +50,7 @@ function canRead(path: string): boolean {
   }
 }
 
-function whichOnPath(command: string): string | undefined {
-  const path = process.env["PATH"] ?? "";
-  for (const dir of path.split(":")) {
-    if (dir === "") continue;
-    const candidate = join(dir, command);
-    try {
-      if (statSync(candidate).isFile() && canRead(candidate)) return candidate;
-    } catch {
-      // Not this directory.
-    }
-  }
-  return undefined;
-}
+
 
 /** Directories macOS keeps app bundles in, in the order Finder lists them. */
 function applicationDirectories(): readonly string[] {
