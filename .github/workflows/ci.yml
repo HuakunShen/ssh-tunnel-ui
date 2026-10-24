@@ -78,13 +78,15 @@ jobs:
         with:
           workspaces: apps/desktop/src-tauri
 
-      # `generate_context!` only requires the `frontendDist` path to exist, so a
-      # stub stands in for the real Web UI here: the release job builds it.
-      - name: Stub the frontend dist
+      # `generate_context!` and `tauri-build` only require the bundled paths to
+      # exist, so stubs stand in for the real artifacts here: the release job
+      # builds them, and nothing from a `cargo check` is ever packaged.
+      - name: Stub the bundled artifacts
         shell: bash
         run: |
-          mkdir -p apps/web/dist
+          mkdir -p apps/web/dist apps/server/dist
           echo '<!doctype html>' > apps/web/dist/index.html
+          echo '// stub' > apps/server/dist/server.mjs
 
       - name: Check the shell
         working-directory: apps/desktop/src-tauri

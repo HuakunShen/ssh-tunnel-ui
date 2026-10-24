@@ -175,14 +175,15 @@ mod windows {
 
     /// Mica backdrops a whole window; acrylic tints it. Prefer mica and fall
     /// back, so a build without it still gets *some* material.
+    ///
+    /// The window itself is passed in: `window-vibrancy` wants
+    /// `HasWindowHandle`, which Tauri's `WebviewWindow` implements, while a raw
+    /// `HWND` from `window.hwnd()` comes from whichever `windows` crate version
+    /// Tauri pinned and does not.
     pub fn install(window: &tauri::WebviewWindow) {
-        let Ok(hwnd) = window.hwnd() else {
-            super::publish(window, "none");
-            return;
-        };
-        let installed = apply_mica(hwnd, None).is_ok() || apply_acrylic(hwnd, None).is_ok();
+        let installed = apply_mica(window, None).is_ok() || apply_acrylic(window, None).is_ok();
         let backdrop = if installed { "vibrancy" } else { "none" };
-        let _ = INSTALLED.set(backdrop);
+        let _ = super::INSTALLED.set(backdrop);
         super::publish(window, backdrop);
     }
 }
