@@ -15,6 +15,19 @@ needs right-click > Open (or `xattr -dr com.apple.quarantine "/Applications/SSH 
 The app carries its own daemon, the Web UI and the icon: once copied it runs
 without this repository next to it.
 
+Tunnels keep running when you quit the app: the daemon and its `ssh` children
+are detached on purpose. The daemon also writes which tunnels were up to
+`~/.ssh-tunnel-ui/runtime.json`, so a daemon that restarts (crash, update)
+re-claims them — including the ability to stop them — instead of mistaking them
+for something it does not own.
+
+Because an SSH tunnel usually points at a machine on your LAN, macOS may ask
+for **Local Network** access the first time it connects. If the connection is
+refused while the same `ssh` command works in a terminal, enable it under
+System Settings → Privacy & Security → Local Network. An unsigned build has no
+stable identity for that grant; signing with a Developer ID makes the prompt
+stick.
+
 ## Gallery
 
 | Web console — dark | Web console — light |
