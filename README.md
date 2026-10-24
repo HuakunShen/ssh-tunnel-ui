@@ -22,22 +22,21 @@ right-click > Open (or `xattr -dr com.apple.quarantine "/Applications/SSH Tunnel
 The Windows installer is unsigned, so SmartScreen offers "More info" > "Run
 anyway".
 
-The app carries its own daemon and Web UI, but runs the daemon through `node`
-(v20 or newer) because it is a TypeScript backend: the shell looks for `node` on
-`PATH`, then in the places a per-user install hides (the login shell on
-macOS/Linux, `Program Files`, Volta and nvm-windows on Windows). On macOS, keep
-`ssh`'s own config it already reads.
+The app carries the tunnel manager linked in-process (Rust, no runtime to
+install) plus the Web UI: installing the app is all it takes. (`node` v20 or
+newer is only needed for the npm CLI/TUI line, never for the app.) On macOS,
+keep `ssh`'s own config it already reads.
 
 Windows note: OpenSSH there has no `ControlMaster`, so a tunnel started in the
 app is owned by its process id rather than by a control socket. Everything the
 UI does still works; only the "someone else's terminal holds it" detection falls
 back to probing the forwarded port.
 
-Tunnels keep running when you quit the app: the daemon and its `ssh` children
-are detached on purpose. The daemon also writes which tunnels were up to
-`~/.ssh-tunnel-ui/runtime.json`, so a daemon that restarts (crash, update)
-re-claims them — including the ability to stop them — instead of mistaking them
-for something it does not own.
+Tunnels keep running when you quit the app: the `ssh` children are detached
+on purpose. The app also writes which tunnels were up to
+`~/.ssh-tunnel-ui/runtime.json`, so the next launch re-claims them —
+including the ability to stop them — instead of mistaking them for something
+it does not own.
 
 Because an SSH tunnel usually points at a machine on your LAN, macOS may ask
 for **Local Network** access the first time it connects. If the connection is
